@@ -1,4 +1,5 @@
 name: CI
+
 on: [push, pull_request]
 
 jobs:
@@ -13,9 +14,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install maturin and pytest
+      - name: Install dependencies
         run: pip install maturin pytest
-      - name: Build and test
-        run: |
-          maturin develop
-          pytest tests/
+      - name: Build wheel
+        run: maturin build --release --out dist --find-interpreter
+      - name: Install wheel
+        run: pip install dist/*.whl
+      - name: Run tests
+        run: pytest tests/
