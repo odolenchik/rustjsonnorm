@@ -242,7 +242,7 @@ for item in dicts {
 }
 
 #[pymodule]
-fn fast_json_normalize(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn rustjsonnorm(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(normalize_one, m)?)?;
     m.add_function(wrap_pyfunction!(normalize_many, m)?)?;
     m.add_function(wrap_pyfunction!(stream_ndjson, m)?)?;

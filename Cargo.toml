@@ -1,11 +1,11 @@
 [package]
-name = "fast-json-normalize"
+name = "rustjsonnorm"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
-name = "fast_json_normalize"
+name = "rustjsonnorm"
 
 [dependencies]
 pyo3 = { version = "0.22", features = ["extension-module", "abi3-py38"] }

@@ -1,11 +1,11 @@
-# fast-json-normalize
+# rustjsonnorm
 
 Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **3.6x faster** at scale.
 
 ## Install
 
 ```bash
-pip install fast-json-normalize
+pip install rustjsonnorm
 ```
 
 Python 3.8+. No build tools required — pre-built wheels for Linux/macOS/Windows.
@@ -17,7 +17,7 @@ Python 3.8+. No build tools required — pre-built wheels for Linux/macOS/Window
 Flatten a nested JSON string into dot-notation key-value pairs:
 
 ```python
-import fast_json_normalize as fjn
+import rustjsonnorm as fjn
 
 result = fjn.normalize_one('{"user": {"name": "Ivan", "city": "Moscow"}}')
 # {'user.name': 'Ivan', 'user.city': 'Moscow'}

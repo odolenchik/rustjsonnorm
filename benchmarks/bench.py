@@ -1,4 +1,4 @@
-"""Benchmark: fast_json_normalize vs pandas.json_normalize."""
+"""Benchmark: rustjsonnorm vs pandas.json_normalize."""
 
 import json
 import os
@@ -17,7 +17,7 @@ def load_records(filepath: str, count: int = 50_000) -> list[dict]:
 
 
 def bench_normalize_many(records: list[dict], repeats: int = 3) -> tuple[float, float]:
-    import fast_json_normalize as fjn
+    import rustjsonnorm as fjn
 
     json_strs = [json.dumps(r) for r in records]
     times = []
@@ -44,7 +44,7 @@ def bench_pandas_normalize(records: list[dict], repeats: int = 3) -> tuple[float
 
 
 def bench_stream_ndjson(filepath: str, count: int = 50_000) -> float:
-    import fast_json_normalize as fjn
+    import rustjsonnorm as fjn
 
     start = time.perf_counter()
     with open(filepath) as f:
@@ -78,7 +78,7 @@ def main():
     # fjn normalize_many (parallel batch)
     best_fjn, worst_fjn = bench_normalize_many(records)
     print(
-        f"fj.normalize_many  : best={best_fjn:.3f}s  "
+        f"rustjsonnorm.normalize_many  : best={best_fjn:.3f}s  "
         f"worst={worst_fjn:.3f}s"
     )
 
@@ -99,7 +99,7 @@ def main():
         stream_time = bench_stream_ndjson(filepath, count=50_000)
         rate = 50_000 / stream_time if stream_time > 0 else float("inf")
         print(
-            f"\nfj.stream_ndjson   : 50,000 lines in {stream_time:.3f}s "
+            f"\nrustjsonnorm.stream_ndjson   : 50,000 lines in {stream_time:.3f}s "
             f"({rate:,.0f} lines/sec)"
         )
     except Exception as e:

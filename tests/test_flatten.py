@@ -1,5 +1,5 @@
 import pytest
-import fast_json_normalize as fjn
+import rustjsonnorm as fjn
 import tempfile
 import os
 
