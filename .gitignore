@@ -16,6 +16,10 @@ env/
 .DS_Store
 Thumbs.db
 
+# Python bytecode cache
+__pycache__/
+*.pyc
+
 # Compiled extensions
 *.so
 *.pyd
