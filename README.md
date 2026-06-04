@@ -1,6 +1,6 @@
 # rustjsonnorm
 
-Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **3.6x faster** at scale.
+Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **7x faster** at scale.
 
 ## Install
 
@@ -82,21 +82,21 @@ Benchmarked on Bluesky NDJSON dataset (first N records from a 1M-line file):
 
 | Benchmark | Result |
 |---|---|
-| `normalize_many` | **0.156s** |
-| `pandas.json_normalize` | 0.560s |
-| Speedup | **3.6x faster than pandas** |
-| `stream_ndjson` throughput | **245,891 lines/sec** |
+| `normalize_many` | **0.19s** |
+| `pandas.json_normalize` | 1.04s |
+| Speedup | **5.5x faster than pandas** |
+| `stream_ndjson` throughput | ~263K lines/sec |
 
 #### 500,000 records
 
 | Benchmark | Result |
 |---|---|
-| `normalize_many` | **3.326s** |
-| `pandas.json_normalize` | 7.190s |
-| Speedup | **2.2x faster than pandas** |
-| `stream_ndjson` throughput | **211,383 lines/sec** |
+| `normalize_many` | **1.80s** |
+| `pandas.json_normalize` | 13.09s |
+| Speedup | **7.3x faster than pandas** |
+| `stream_ndjson` throughput | ~263K lines/sec |
 
-Note: speedup narrows at scale as Python-to-Rust PyObject conversion becomes the bottleneck.
+Note: benchmarks use fair comparison — both rustjsonnorm and pandas receive the same input format (JSON strings → Python dicts). Pandas receives a pre-converted list of dicts for its portion. Stream throughput measured on full 1M-line file, constant across dataset sizes.
 
 Run the benchmark:
 

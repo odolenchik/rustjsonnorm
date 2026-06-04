@@ -104,7 +104,6 @@ fn node_to_string(node: &simd_json::StaticNode) -> String {
 #[pyclass]
 struct NdjsonIterator {
     reader: BufReader<File>,
-    buffer: String,
     opts: Arc<FlattenOptions>,
 }
 
@@ -112,21 +111,19 @@ struct NdjsonIterator {
 impl NdjsonIterator {
     fn __next__(mut slf: PyRefMut<'_, Self>, py: Python<'_>) -> PyResult<Option<PyObject>> {
         loop {
-            let mut line_buf = String::new();
-            let bytes = (&mut slf.reader).read_line(&mut line_buf)
+            let mut line = String::new();
+            let bytes = slf.reader.read_line(&mut line)
                 .map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
             if bytes == 0 {
                 return Ok(None);
             }
 
-            // Trim the read line and store it in slf.buffer for reuse next iteration
-            let trimmed = line_buf.trim().to_owned();
-            std::mem::swap(&mut slf.buffer, &mut line_buf);
-
+            // Trim trailing newline/whitespace.
+            let trimmed = line.trim_end();
             if trimmed.is_empty() {
                 continue;
             }
-            match process_one(&trimmed, &slf.opts) {
+            match process_one(trimmed, &slf.opts) {
                 Ok(map) => {
                     let dict = PyDict::new_bound(py);
                     for (k, v) in map {
@@ -152,7 +149,7 @@ fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, 
     if let Some(p) = array_prefix { opts.array_prefix = p.to_string(); }
     if let Some(s) = array_suffix { opts.array_suffix = s.to_string(); }
     if let Some(d) = max_depth { opts.max_depth = d; }
-    Ok(NdjsonIterator { reader: BufReader::new(File::open(filepath).map_err(|e| pyo3::exceptions::PyFileNotFoundError::new_err(e.to_string()))?), buffer: String::new(), opts: Arc::new(opts) })
+    Ok(NdjsonIterator { reader: BufReader::new(File::open(filepath).map_err(|e| pyo3::exceptions::PyFileNotFoundError::new_err(e.to_string()))?), opts: Arc::new(opts) })
 }
 
 #[pyfunction]
