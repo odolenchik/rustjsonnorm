@@ -50,6 +50,8 @@ RAYON_NUM_THREADS=1 pytest test_benchmarks.py --benchmark-only \
 | `correctness_*`, `stress_*` | Row-by-row key+value comparison | Output equivalence |
 | `test_stream_ndjson_rust_huge` | Streaming NDJSON throughput | I/O-bound performance |
 | `test_options_*` | preserve_types, max_depth overheads | Feature cost |
+| `correctness_dense`, `correctness_sparse`, `correctness_deep`, `correctness_unicode` | Dense (105 fields), sparse (~5% keys), deep nesting (depth=4), unicode-heavy | Output equivalence across edge-case schemas |
+| `test_stream_malformed*` | Malformed stream with ~1% bad lines | NdjsonIterator robustness in strict/non-strict mode |
 
 ## Full run (all tests)
 

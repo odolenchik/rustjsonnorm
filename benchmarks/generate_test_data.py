@@ -183,6 +183,159 @@ def generate_corrupt_stream(output_dir: str, total_lines: int = 50_000):
     print(f"Generated corrupt_stream.ndjson: {total_lines} lines ({size_kb:.0f} KB, ~{actual_bad} bad)")
 
 
+# ---------------------------------------------------------------------------
+# New fixture generators (dense, sparse, deep, unicode, malformed)
+# ---------------------------------------------------------------------------
+
+def dense_schema_object(n_fields: int = 105) -> dict:
+    """Flat object with 100+ fields — tests column allocation and indexmap traversal."""
+    return {f"f{i}": rand_str(6) for i in range(n_fields)}
+
+
+def sparse_object(all_keys: list, sample_rate: float = 0.05) -> dict:
+    """Sparse object with ~5% of possible keys present — tests dynamic schema building overhead."""
+    count = max(1, int(len(all_keys) * sample_rate))
+    chosen = random.sample(all_keys, min(count, len(all_keys)))
+    return {k: rand_str(6) for k in sorted(chosen)}
+
+
+def deep_object(depth: int = 10, branching: int = 3) -> dict:
+    """Deeply nested object — tests recursive traversal and path key generation."""
+    if depth <= 0:
+        kind = random.randint(0, 4)
+        if kind == 0:
+            return rand_str(6)
+        elif kind == 1:
+            return random.randint(0, 10_000)
+        elif kind == 2:
+            return round(random.uniform(0, 100), 2)
+        elif kind == 3:
+            return random.choice([True, False])
+        else:
+            return None
+
+    obj = {}
+    for i in range(branching):
+        key = f"l{depth}_k{i}"
+        obj[key] = deep_object(depth - 1, branching)
+    return obj
+
+
+def unicode_object() -> dict:
+    """Unicode-heavy object — tests UTF-8 correctness and non-ASCII performance."""
+    scripts = [
+        ("name", "мир"),
+        ("emoji", "\U0001f600\U0001f389"),
+        ("chinese", "你好世界"),
+        ("cyrillic", "привет мир"),
+        ("mixed", "test 日本語 \U0001f680 test"),
+    ]
+    obj = {}
+    random.shuffle(scripts)
+    for key, value in scripts:
+        obj[key] = value
+    # Add a few normal fields too
+    obj["id"] = random.randint(1, 1_000_000)
+    obj["count"] = random.randint(0, 1000)
+    return obj
+
+
+def generate_dense_schema(output_dir: str, n_records: int = 100_000):
+    """Generate dense-schema NDJSON (105 fields per record)."""
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "dense_schema.ndjson")
+    with open(path, "w", encoding="utf-8") as f:
+        for _ in range(n_records):
+            f.write(json.dumps(dense_schema_object(105)) + "\n")
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    print(f"Generated dense_schema.ndjson: {n_records} records ({size_mb:.1f} MB)")
+
+
+def generate_sparse_schema(output_dir: str, n_records: int = 100_000):
+    """Generate sparse-schema NDJSON (~5% of 200 possible keys per record)."""
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "sparse_schema.ndjson")
+    all_keys = [f"key_{i}" for i in range(200)]
+    with open(path, "w", encoding="utf-8") as f:
+        for _ in range(n_records):
+            f.write(json.dumps(sparse_object(all_keys, sample_rate=0.05)) + "\n")
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    print(f"Generated sparse_schema.ndjson: {n_records} records ({size_mb:.1f} MB)")
+
+
+def generate_deep_nesting(output_dir: str, n_records: int = 10_000):
+    """Generate deep-nesting NDJSON (depth=4, branching=2 — path depth ~5)."""
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "deep_nesting.ndjson")
+    with open(path, "w", encoding="utf-8") as f:
+        for _ in range(n_records):
+            f.write(json.dumps(deep_object(depth=4, branching=2)) + "\n")
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    print(f"Generated deep_nesting.ndjson: {n_records} records ({size_mb:.1f} MB)")
+
+
+def generate_unicode_heavy(output_dir: str, n_records: int = 50_000):
+    """Generate unicode-heavy NDJSON."""
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "unicode_heavy.ndjson")
+    with open(path, "w", encoding="utf-8") as f:
+        for _ in range(n_records):
+            f.write(json.dumps(unicode_object(), ensure_ascii=False) + "\n")
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    print(f"Generated unicode_heavy.ndjson: {n_records} records ({size_mb:.1f} MB)")
+
+
+def generate_malformed_stream(output_dir: str, total_lines: int = 100_000):
+    """Generate malformed NDJSON (~1% corrupt lines) for stream robustness testing."""
+    os.makedirs(output_dir, exist_ok=True)
+    path = os.path.join(output_dir, "malformed_stream.ndjson")
+
+    bad_templates = [
+        "NOT_JSON", "", "{invalid}", '{"incomplete":', "{{}",
+        '{"key": "value\x00with\x07control"}',  # control chars
+        '{"key": "unescaped"quote}',              # unescaped quote in value
+        '{truly broken json!!!',                   # gibberish object
+        'null\n123\ntrue',                         # multiple non-objects on one line (counted once)
+    ]
+    bad_count = max(1, int(total_lines * 0.01))
+    good_count = total_lines - bad_count
+
+    lines: list[str] = []
+    for _ in range(good_count):
+        lines.append(json.dumps(flat_object(15)))
+    for _ in range(bad_count):
+        lines.append(random.choice(bad_templates))
+
+    random.shuffle(lines)
+    with open(path, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    actual_bad = sum(1 for l in open(path) if not _is_valid_json_line(l.strip()))
+    print(f"Generated malformed_stream.ndjson: {total_lines} lines ({size_mb:.1f} MB, ~{actual_bad} bad)")
+
+
+def generate_extra_fixtures(output_dir: str):
+    """Generate all new fixture types."""
+    os.makedirs(output_dir, exist_ok=True)
+    random.seed(42)
+
+    generate_dense_schema(output_dir, n_records=100_000)
+    generate_sparse_schema(output_dir, n_records=100_000)
+    generate_deep_nesting(output_dir, n_records=10_000)
+    generate_unicode_heavy(output_dir, n_records=50_000)
+    generate_malformed_stream(output_dir, total_lines=100_000)
+
+    print("\nGenerated extra fixtures:")
+    for name in ["dense_schema.ndjson", "sparse_schema.ndjson", "deep_nesting.ndjson",
+                  "unicode_heavy.ndjson", "malformed_stream.ndjson"]:
+        path = os.path.join(output_dir, name)
+        if os.path.exists(path):
+            size_mb = os.path.getsize(path) / (1024 * 1024)
+            print(f"  {name}: {size_mb:.1f} MB")
+
+
 def _is_valid_json_line(s: str) -> bool:
     try:
         json.loads(s)
@@ -200,5 +353,6 @@ if __name__ == "__main__":
     generate_single_object_tests(output_dir)
     generate_batch_datasets(output_dir)
     generate_corrupt_stream(output_dir)
+    generate_extra_fixtures(output_dir)
 
     print("\nDone. All test data generated in:", output_dir)

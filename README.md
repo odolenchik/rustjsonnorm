@@ -111,6 +111,28 @@ python benchmarks/bench.py path/to/data.ndjson
 
 The benchmark script loads N records (default 50,000) and compares `rustjsonnorm.normalize_many` against `pandas.json_normalize`. It also measures `stream_ndjson` throughput.
 
+### Running the full benchmark suite locally
+
+```bash
+pip install pytest pytest-benchmark pandas numpy
+
+# Generate all synthetic test fixtures
+cd benchmarks && python generate_test_data.py test_data
+
+# Correctness checks (regular pytest, no benchmark calibration)
+python -m pytest test_benchmarks.py -k "correctness or stress" -v
+
+# Single-threaded benchmarks (algorithmic comparison)
+RAYON_NUM_THREADS=1 python -m pytest test_benchmarks.py --benchmark-only \
+    --benchmark-warmup=False --benchmark-min-rounds=10 --benchmark-min-time=0.2 -v -k "singlethread"
+
+# Multi-threaded benchmarks (real-world throughput)
+python -m pytest test_benchmarks.py --benchmark-only \
+    --benchmark-warmup=False --benchmark-min-rounds=10 --benchmark-min-time=0.2 -v -k "multithread"
+```
+
+The suite includes fixtures for dense schemas (105 fields), sparse objects (~5% keys), deep nesting, unicode-heavy data, and malformed streams — ensuring robustness across real-world JSON shapes.
+
 ## How it works
 
 The library is written in Rust and uses three key crates:

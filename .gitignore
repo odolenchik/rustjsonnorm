@@ -23,3 +23,10 @@ __pycache__/
 # Compiled extensions
 *.so
 *.pyd
+benchmarks/test_data/large_batch_1m.ndjson
+benchmarks/test_data/bluesky_file_0001.json
+benchmarks/test_data/dense_schema.ndjson
+benchmarks/test_data/sparse_schema.ndjson
+benchmarks/test_data/deep_nesting.ndjson
+benchmarks/test_data/unicode_heavy.ndjson
+benchmarks/test_data/malformed_stream.ndjson
