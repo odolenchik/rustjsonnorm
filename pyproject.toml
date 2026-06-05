@@ -37,3 +37,6 @@ ignore = ["E741", "F841"]
 minversion = "7.0"
 testpaths = ["tests"]
 addopts = "-ra -q --strict-markers"
+markers = [
+    "slow: marks tests as slow (skip in CI)",
+]

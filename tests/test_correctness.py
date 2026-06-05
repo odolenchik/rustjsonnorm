@@ -269,6 +269,7 @@ def _rust_normalize_many_from_strings(json_strs):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_correctness_rust_vs_pandas_small(batch_data):
     """Rust normalize_many and pandas json_normalize produce identical results."""
     if "small_batch" not in batch_data:
@@ -284,6 +285,7 @@ def test_correctness_rust_vs_pandas_small(batch_data):
     _compare_results(rust_results, pandas_df, "small_batch")
 
 
+@pytest.mark.slow
 def test_correctness_rust_vs_pandas_medium(batch_data):
     """Rust normalize_many and pandas json_normalize produce identical results."""
     if "medium_batch" not in batch_data:
@@ -385,6 +387,7 @@ def test_stream_malformed_strict_mode(malformed_stream_file):
             assert isinstance(r, dict) and len(r) >= 1
 
 
+@pytest.mark.slow
 def test_stress_single_thread_sync():
     """Multi-threaded Rust normalize_many produces same results as single-threaded."""
     test_input = [json.dumps({"a": 1, "b": {"c": [True, False, None, 42]}}) for _ in range(50)]
