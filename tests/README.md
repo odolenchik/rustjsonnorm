@@ -1,143 +1,143 @@
-# Tests — полное описание
+# Tests — full documentation
 
-## Организация тестов
+## Test organization
 
-| Файл | Назначение | Кол-во тестов |
+| File | Purpose | Number of tests |
 |---|---|---|
-| `test_flatten.py` | Юнит-тесты: корректность flatten-функций, типы, параметры, стриминг | ~50 |
-| `test_correctness.py` | Сравнение вывода rustjsonnorm с pandas.json_normalize на реальных данных | ~18 |
+| `test_flatten.py` | Unit tests: flatten correctness, types, options, streaming | ~50 |
+| `test_correctness.py` | Compare rustjsonnorm output against pandas.json_normalize on real data | ~18 |
 
-Оба файла запускаются через pytest. Для запуска всех тестов выполните:
+Run all tests via pytest:
 
 ```bash
 pytest tests/ -v
 ```
 
-Для запуска только конкретного набора:
+To run specific suites:
 
 ```bash
-pytest tests/test_flatten.py -v          # юнит-тесты
-pytest tests/test_correctness.py -v      # сравнение с pandas
+pytest tests/test_flatten.py -v          # unit tests
+pytest tests/test_correctness.py -v      # pandas comparison
 ```
 
 ---
 
-## test_flatten.py — юнит-тесты
+## test_flatten.py — Unit tests
 
-Тесты покрывают три группы функций: `normalize_one`, `normalize_many`, `stream_ndjson`.
+Tests cover three function groups: `normalize_one`, `normalize_many`, `stream_ndjson`.
 
 ### Single object (normalize_one)
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_empty_object` | `{}` → пустой словарь, без ошибок |
-| `test_empty_array` | `{"a": []}` → пустой словарь, пустые массивы не порождают ключей |
-| `test_deep_nesting_respects_max_depth` | Глубокая вложенность (`"a":{"b":{"c":{"d":{"e":"deep"}}}}`) корректно обрезается по `max_depth=3` — ключ `a.b.c` отсутствует в результате |
-| `test_key_with_separator_collision` | Ключ, содержащий точку (`"a.b": 1`), не интерпретируется как вложенность — при `sep="."` результат `{"a.b": "1"}` |
-| `test_key_equals_sep` | Ключ `/` с `sep="/"` — ключ не разбивается на `"a"` и `"b"` |
-| `test_unicode_keys` | Кириллические ключи (`"привет": "мир"`) передаются без потерь |
-| `test_unicode_key_emoji` | Эмодзи в ключах (`"😀": "happy"`) сохраняются корректно |
-| `test_nan_value_throws` | Непарсимый JSON (`NaN`) вызывает ValueError (simd-json строгий к NaN) |
-| `test_mixed_types_in_array` | Top-level массив `[1, "a", null, true]` вызывает ValueError |
-| `test_large_string_value` | Строка ~500KB передаётся без ошибок и потери данных |
-| `test_simple_object` | Простой объект `{"a": 1}` → `{"a": "1"}` (preserve_types=False) |
-| `test_nested_object` | Вложенный объект `{"a":{"b":2,"c":3}}` → `{"a.b":"2","a.c":"3"}` |
-| `test_null` | JSON null при preserve_types=False → строка `"null"` |
-| `test_boolean` | JSON boolean при preserve_types=False → строка `"true"/"false"` |
-| `test_string_value` | Строковое значение передаётся без изменений |
-| `test_invalid_json` | Некорректный JSON вызывает ValueError |
+| `test_empty_object` | `{}` → empty dict, no errors |
+| `test_empty_array` | `{"a": []}` → empty dict; empty arrays produce no keys |
+| `test_deep_nesting_respects_max_depth` | Deep nesting (`"a":{"b":{"c":{"d":{"e":"deep"}}}}`) correctly stops at `max_depth=3` — key `a.b.c` absent from result |
+| `test_key_with_separator_collision` | Key containing a dot (`"a.b": 1`) is not treated as nested path — with `sep="."` result is `{"a.b": "1"}` |
+| `test_key_equals_sep` | Key `/` with `sep="/"` — key is not split into `"a"` and `"b"` |
+| `test_unicode_keys` | Cyrillic keys (`"привет": "мир"`) pass through unchanged |
+| `test_unicode_key_emoji` | Emoji in keys (`"😀": "happy"`) preserved correctly |
+| `test_nan_value_throws` | Unparseable JSON (`NaN`) raises ValueError (simd-json is strict about NaN) |
+| `test_mixed_types_in_array` | Top-level array `[1, "a", null, true]` raises ValueError |
+| `test_large_string_value` | ~500KB string passes through without errors or data loss |
+| `test_simple_object` | Simple object `{"a": 1}` → `{"a": "1"}` (preserve_types=False) |
+| `test_nested_object` | Nested object `{"a":{"b":2,"c":3}}` → `{"a.b":"2","a.c":"3"}` |
+| `test_null` | JSON null with preserve_types=False → string `"null"` |
+| `test_boolean` | JSON boolean with preserve_types=False → string `"true"/"false"` |
+| `test_string_value` | String value passes through unchanged |
+| `test_invalid_json` | Invalid JSON raises ValueError |
 
 ### Arrays (normalize_one)
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_array_primitives` | Массив примитивов: `"a":[1,2,3]` → `{"a[0]":"1","a[1]":"2","a[2]":"3"}` |
-| `test_nested_arrays` | Вложенные массивы: `{"a":[[1,2],[3,4]]}` → `{"a[0][0]":"1",...}` |
-| `test_array_of_objects` | Массив объектов: `{"a":[{"b":1},{"b":2}]}` → `{"a[0].b":"1","a[1].b":"2"}` |
+| `test_array_primitives` | Primitive array: `"a":[1,2,3]` → `{"a[0]":"1","a[1]":"2","a[2]":"3"}` |
+| `test_nested_arrays` | Nested arrays: `{"a":[[1,2],[3,4]]}` → `{"a[0][0]":"1",...}` |
+| `test_array_of_objects` | Array of objects: `{"a":[{"b":1},{"b":2}]}` → `{"a[0].b":"1","a[1].b":"2"}` |
 
 ### Options (sep, array brackets, max_depth)
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_custom_sep` | Кастомный разделитель `sep="/"` — `"a":{"b":1}` → `{"a/b":1}` |
-| `test_custom_array_brackets` | Кастомные скобки массива: `array_prefix="(", array_suffix=")"` → `a(0), a(1)` |
-| `test_max_depth` / `test_max_depth_exact` / `test_max_depth_preserves_shallow` | Три теста на разную глубину (`max_depth=1, 2`) — ключи глубже лимита отсутствуют |
+| `test_custom_sep` | Custom separator `sep="/"` — `"a":{"b":1}` → `{"a/b":1}` |
+| `test_custom_array_brackets` | Custom array brackets: `array_prefix="(", array_suffix=")"` → `a(0), a(1)` |
+| `test_max_depth` / `test_max_depth_exact` / `test_max_depth_preserves_shallow` | Three tests at different depths (`max_depth=1, 2`) — keys deeper than the limit are absent from result |
 
 ### Batch (normalize_many)
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_normalize_many_empty_list` | Пустой список → пустой результат |
-| `test_normalize_many_with_invalid_entry` | Невалидный JSON в списке вызывает ValueError |
-| `test_normalize_many` | Базовый параллельный flatten двух объектов |
-| `test_normalize_many_parallel_order` | Порядок результатов соответствует порядку входных данных (10 элементов) |
-| `test_normalize_many_with_options` | Параметры передаются корректно в batch-режиме (`sep="/", preserve_types=False`) |
-| `test_normalize_many_preserves_order` | 100 элементов — порядок строго сохранён, значения совпадают |
+| `test_normalize_many_empty_list` | Empty list → empty result |
+| `test_normalize_many_with_invalid_entry` | Invalid JSON in a batch raises ValueError |
+| `test_normalize_many` | Basic parallel flatten of two objects |
+| `test_normalize_many_parallel_order` | Output order matches input order (10 elements) |
+| `test_normalize_many_with_options` | Options (`sep="/", preserve_types=False`) applied correctly in batch mode |
+| `test_normalize_many_preserves_order` | 100 elements — order strictly preserved, values match exactly |
 
 ### Stream (stream_ndjson)
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_stream_ndjson_basic` | Базовый стриминг NDJSON файла с двумя записями |
-| `test_stream_ndjson_empty_file` | Пустой файл → пустая итерация, без ошибок |
-| `test_stream_ndjson_skips_blank_lines` | Пустые строки между JSON-строками пропускаются корректно |
-| `test_stream_ndjson_with_options` | Параметры стрима (`sep="/"`) применяются верно |
-| `test_stream_ndjson_skips_bad_lines` | Некорректные строки в нестрогом режиме (strict=False) пропускаются молча |
-| `test_stream_ndjson_max_depth` | max_depth работает в стриминговом режиме |
-| `test_stream_ndjson_strict_raises_on_bad_line` | Strict режим: ValueError на первой плохой строке с указанием номера строки |
-| `test_stream_ndjson_strict_correct_line_number` | Номер строки в ошибке точен (пустые строки не считаются) |
-| `test_stream_ndjson_non_strict_default` | Нестрогий режим по умолчанию пропускает bad lines |
+| `test_stream_ndjson_basic` | Basic NDJSON file streaming with two records |
+| `test_stream_ndjson_empty_file` | Empty file → empty iteration, no errors |
+| `test_stream_ndjson_skips_blank_lines` | Blank lines between JSON records are skipped correctly |
+| `test_stream_ndjson_with_options` | Stream options (`sep="/"`) applied correctly |
+| `test_stream_ndjson_skips_bad_lines` | Invalid lines silently skipped in non-strict mode (strict=False) |
+| `test_stream_ndjson_max_depth` | max_depth works in streaming mode |
+| `test_stream_ndjson_strict_raises_on_bad_line` | Strict mode: ValueError raised on first bad line with line number |
+| `test_stream_ndjson_strict_correct_line_number` | Line number in error is exact (blank lines not counted) |
+| `test_stream_ndjson_non_strict_default` | Non-strict default skips bad lines silently |
 
 ### Type preservation
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_normalize_one_accepts_bytes` | Вход может быть bytes, а не только str — `b'{"a": 1}'` работает |
+| `test_normalize_one_accepts_bytes` | Input can be bytes, not only str — `b'{"a": 1}'` works |
 | `test_preserve_types_numbers_booleans_null` | preserve_types=True: int→int, float→float, bool→bool, null→None |
-| `test_preserve_types_default_returns_native_types` | По умолчанию preserve_types=True возвращает нативные типы Python |
-| `test_preserve_types_disabled_returns_strings` | preserve_types=False возвращает ВСЁ как строки |
-| `test_normalize_many_preserve_types` | Batch режим с preserve_types: int, bool корректно сохраняются |
-| `test_stream_ndjson_preserve_types` | Stream режим с preserve_types: int, bool, float корректны |
-| `test_preserve_types_nested_arrays` | preserve_types в массивах: `[1, true, null, 2.5]` → int, bool, None, float |
-| `test_preserve_types_null_string_not_converted` | JSON `"null"` (строка) ≠ JSON null — строка остаётся строкой, null → None |
-| `test_preserve_types_large_int` | Границы u64/i64: `18446744073709551615` и `-9223372036854775808` передаются точно |
+| `test_preserve_types_default_returns_native_types` | By default preserve_types=True returns native Python types |
+| `test_preserve_types_disabled_returns_strings` | preserve_types=False returns everything as strings |
+| `test_normalize_many_preserve_types` | Batch mode with preserve_types: int, bool correctly preserved |
+| `test_stream_ndjson_preserve_types` | Stream mode with preserve_types: int, bool, float correctly preserved |
+| `test_preserve_types_nested_arrays` | Arrays with preserve_types: `[1, true, null, 2.5]` → int, bool, None, float |
+| `test_preserve_types_null_string_not_converted` | JSON `"null"` (string) ≠ JSON null — string stays string, null → None |
+| `test_preserve_types_large_int` | u64/i64 boundaries: `18446744073709551615` and `-9223372036854775808` preserved exactly |
 
 ---
 
-## test_correctness.py — сравнение с pandas
+## test_correctness.py — pandas comparison tests
 
-Каждый тест сравнивает вывод rustjsonnorm с `pandas.json_normalize` на одних и тех же данных. Используется хелпер `_compare_results`, который нормализует типы (числа, булевы значения, NaN) для корректного сравнения.
+Each test compares rustjsonnorm output with `pandas.json_normalize` on the same data. Uses helper `_compare_results` which normalizes types (numbers, booleans, NaN) for accurate comparison.
 
-### Фикстуры (данные)
+### Fixtures (test data)
 
-| Фикстура | Источник | Описание |
+| Fixture | Source | Description |
 |---|---|---|
-| `single_objects` | 4 JSON файла | flat, nested_small, nested_deep, arrays_large |
-| `batch_data` | NDJSON файлы | small_batch, medium_batch, large_batch |
-| `dense_schema` | dense_schema.ndjson (105 полей на запись) |
-| `sparse_schema` | sparse_schema.ndjson (~5% заполненных из 200 возможных ключей) |
-| `deep_nesting_data` | deep_nesting.ndjson (глубина=4, branching=2) |
-| `unicode_heavy_data` | unicode_heavy.ndjson (много не-ASCII символов) |
-| `malformed_stream_file` | malformed_stream.ndjson (содержит невалидные JSON строки) |
+| `single_objects` | 4 JSON files | flat, nested_small, nested_deep, arrays_large |
+| `batch_data` | NDJSON files | small_batch, medium_batch, large_batch |
+| `dense_schema` | dense_schema.ndjson (105 fields per record) |
+| `sparse_schema` | sparse_schema.ndjson (~5% filled of 200 possible keys) |
+| `deep_nesting_data` | deep_nesting.ndjson (depth=4, branching=2) |
+| `unicode_heavy_data` | unicode_heavy.ndjson (lots of non-ASCII characters) |
+| `malformed_stream_file` | malformed_stream.ndjson (contains invalid JSON lines) |
 
-### Тесты корректности
+### Correctness tests
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| `test_correctness_rust_vs_pandas_small` | Batch-режим: rust normalize_many vs pandas json_normalize на small_batch.ndjson — результаты идентичны |
-| `test_correctness_rust_vs_pandas_medium` | То же на medium_batch.ndjson (больше записей, нагрузка на параллелизм) |
-| `test_correctness_single_flat` | Single-объект: flat JSON → rust normalize_one vs pandas json_normalize — идентично |
-| `test_correctness_single_nested_deep` | Single-объект: глубокая вложенность → rust vs pandas — идентично |
-| `test_correctness_dense` | 105 полей на запись — rust и pandas производят одинаковый набор ключей и значений |
-| `test_correctness_sparse` | ~5% заполненных из 200 ключей — handle sparse schema: каждая запись может иметь разный набор ключей |
-| `test_correctness_deep` | Глубокая вложенность (глубина=4) — rust vs pandas идентичны |
-| `test_correctness_unicode` | Unicode-heavy данные — символы всех языков передаются корректно, без потерь кодировки |
-| `test_stream_malformed` | Stream итератор пропускает невалидные строки, возвращает только валидные записи |
-| `test_stream_malformed_strict_mode` | Strict режим: ValueError поднимается на первой невалидной строке с номером строки |
-| `test_stress_single_thread_sync` | Многопоточный normalize_many детерминирован: результаты совпадают при многократном запуске, порядок ключей согласован |
+| `test_correctness_rust_vs_pandas_small` | Batch mode: rust normalize_many vs pandas json_normalize on small_batch.ndjson — results identical |
+| `test_correctness_rust_vs_pandas_medium` | Same on medium_batch.ndjson (more records, tests parallelism) |
+| `test_correctness_single_flat` | Single object: flat JSON → rust normalize_one vs pandas json_normalize — identical |
+| `test_correctness_single_nested_deep` | Single object: deep nesting → rust vs pandas — identical |
+| `test_correctness_dense` | 105 fields per record — both produce the same set of keys and values |
+| `test_correctness_sparse` | ~5% filled out of 200 keys — each record may have different key sets, handled correctly |
+| `test_correctness_deep` | Deep nesting (depth=4) — rust vs pandas identical |
+| `test_correctness_unicode` | Unicode-heavy data — all characters preserved without encoding loss |
+| `test_stream_malformed` | Stream iterator skips invalid lines, returns only valid records |
+| `test_stream_malformed_strict_mode` | Strict mode: ValueError raised on first invalid line with line number |
+| `test_stress_single_thread_sync` | Multi-threaded normalize_many is deterministic: results match across repeated runs, key ordering consistent |
 
-### Хелперы сравнения
+### Comparison helpers
 
-- `_normalise_value(v)` — нормализует значение к строке для сравнения (处理 None, bool, int, float с Decimal точностью, numpy типы)
-- `_assert_keys_compatible(rust_keys, pandas_cols)` — проверяет что все не-массивные ключи rust присутствуют в pandas
-- `_compare_results(rust_results, pandas_df)` — сравнивает результаты построчно; для sparse данных — per-row сравнение с handling array notation (`a[0]` vs `a`)
+- `_normalise_value(v)` — normalizes a value to string for comparison (handles None, bool, int, float with Decimal precision, numpy types)
+- `_assert_keys_compatible(rust_keys, pandas_cols)` — checks that all non-array rust keys exist in pandas output
+- `_compare_results(rust_results, pandas_df)` — compares results row by row; for sparse data uses per-row comparison handling array notation (`a[0]` vs `a`)
