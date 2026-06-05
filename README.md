@@ -61,8 +61,8 @@ for row in fjn.stream_ndjson("large_file.ndjson"):
 | `sep` | `"."` | Separator between nested keys |
 | `array_prefix` | `"["` | Opening bracket for array indices |
 | `array_suffix` | `"]"` | Closing bracket for array indices |
-| `max_depth` | `100` | Stop recursing at this depth (leaf values converted to strings) |
-| `preserve_types` | `False` | When `True`, numeric and boolean JSON values are returned as native Python types (`int`, `float`, `bool`) instead of strings. `null` becomes `None`. |
+| `max_depth` | `100` | Stop recursing at this depth (leaf values returned as-is, respecting preserve_types) |
+| `preserve_types` | `True` | Numeric and boolean JSON values are returned as native Python types (`int`, `float`, `bool`). `null` becomes `None`. Set to `False` for string-only mode (max performance). |
 
 ### Example: preserve original types
 

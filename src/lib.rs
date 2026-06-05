@@ -38,7 +38,7 @@ impl Default for FlattenOptions {
             array_prefix: "[".to_string(),
             array_suffix: "]".to_string(),
             max_depth: 100,
-            preserve_types: false,
+            preserve_types: true,
         }
     }
 }

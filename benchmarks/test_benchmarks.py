@@ -74,6 +74,20 @@ def batch_data():
     return batches
 
 
+@pytest.fixture(scope="session")
+def large_batch_1m():
+    """Load 1M-record NDJSON as (list_of_strings, list_of_dicts)."""
+    path = os.path.join(TEST_DATA_DIR, "large_batch_1m.ndjson")
+    if not os.path.exists(path):
+        pytest.skip("large_batch_1m.ndjson not found", allow_module_level=True)
+    with open(path) as f:
+        lines = [l.strip() for l in f.readlines()]
+
+    json_strs = list(lines)
+    py_dicts = [json.loads(l) for l in lines]
+    return (json_strs, py_dicts)
+
+
 # ---------------------------------------------------------------------------
 # Core comparison helpers
 # ---------------------------------------------------------------------------
@@ -360,6 +374,29 @@ def test_normalize_many_pandas_large_symmetric(benchmark, batch_data):
     if "large_batch" not in batch_data:
         pytest.skip("large_batch.ndjson not found")
     json_strs, py_dicts = batch_data["large_batch"]
+
+    def run():
+        dicts = [json.loads(s) for s in json_strs]
+        import pandas
+        return pandas.json_normalize(dicts)
+
+    result = benchmark(run)
+
+
+def test_normalize_many_rust_1m(benchmark, large_batch_1m):
+    """Benchmark rustjsonnorm on 1M records."""
+    json_strs, _ = large_batch_1m
+
+    def run():
+        import rustjsonnorm as fjn
+        return fjn.normalize_many(json_strs)
+
+    result = benchmark(run)
+
+
+def test_normalize_many_pandas_1m(benchmark, large_batch_1m):
+    """Benchmark pandas on 1M records (symmetric)."""
+    json_strs, _ = large_batch_1m
 
     def run():
         dicts = [json.loads(s) for s in json_strs]

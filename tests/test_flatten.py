@@ -22,15 +22,15 @@ def test_deep_nesting_respects_max_depth():
 
 def test_key_with_separator_collision():
     # ключ содержит точку, но не должен интерпретироваться как вложенность
-    result = fjn.normalize_one('{"a.b": 1}')
+    result = fjn.normalize_one('{"a.b": 1}', preserve_types=False)
     assert result == {"a.b": "1"}
 
 
 def test_key_equals_sep():
     # sep="/", ключ тоже "/" — не должен быть разбит на части
-    result = fjn.normalize_one('{"a/b": 42}', sep="/")
+    result = fjn.normalize_one('{"a/b": 42}', sep="/" )
     assert "a/b" in result
-    assert result["a/b"] == "42"
+    assert result["a/b"] == 42
     # И нет ключей "a" или "b"
     assert "a" not in result
     assert "b" not in result
@@ -80,25 +80,25 @@ def test_normalize_many_with_invalid_entry():
 
 def test_all_primitive_types_flat():
     # Проверка всех типов примитивов на верхнем уровне объекта
-    result = fjn.normalize_one('{"s":"hi","i":42,"f":3.14,"b":true,"n":null}')
+    result = fjn.normalize_one('{"s":"hi","i":42,"f":3.14,"b":true,"n":null}', preserve_types=False)
     assert result == {"s": "hi", "i": "42", "f": "3.14", "b": "true", "n": "null"}
 
 
 def test_simple_object():
-    assert fjn.normalize_one('{"a": 1}') == {"a": "1"}
+    assert fjn.normalize_one('{"a": 1}', preserve_types=False) == {"a": "1"}
 
 
 def test_nested_object():
-    result = fjn.normalize_one('{"a": {"b": 2, "c": 3}}')
+    result = fjn.normalize_one('{"a": {"b": 2, "c": 3}}', preserve_types=False)
     assert result == {"a.b": "2", "a.c": "3"}
 
 
 def test_null():
-    assert fjn.normalize_one('{"x": null}') == {"x": "null"}
+    assert fjn.normalize_one('{"x": null}', preserve_types=False) == {"x": "null"}
 
 
 def test_boolean():
-    assert fjn.normalize_one('{"x": true}') == {"x": "true"}
+    assert fjn.normalize_one('{"x": true}', preserve_types=False) == {"x": "true"}
 
 
 def test_string_value():
@@ -111,28 +111,28 @@ def test_invalid_json():
 
 
 def test_array_primitives():
-    result = fjn.normalize_one('{"a": [1,2,3]}')
+    result = fjn.normalize_one('{"a": [1,2,3]}', preserve_types=False)
     assert result == {"a[0]": "1", "a[1]": "2", "a[2]": "3"}
 
 
 def test_nested_arrays():
-    result = fjn.normalize_one('{"a": [[1,2],[3,4]]}')
+    result = fjn.normalize_one('{"a": [[1,2],[3,4]]}', preserve_types=False)
     assert result == {"a[0][0]": "1", "a[0][1]": "2", "a[1][0]": "3", "a[1][1]": "4"}
 
 
 def test_array_of_objects():
-    result = fjn.normalize_one('{"a": [{"b": 1}, {"b": 2}]}')
+    result = fjn.normalize_one('{"a": [{"b": 1}, {"b": 2}]}' , preserve_types=False)
     assert result == {"a[0].b": "1", "a[1].b": "2"}
 
 
 def test_custom_sep():
     result = fjn.normalize_one('{"a": {"b": 1}}', sep="/")
-    assert result == {"a/b": "1"}
+    assert result == {"a/b": 1}
 
 
 def test_custom_array_brackets():
     result = fjn.normalize_one('{"a": [1,2]}', array_prefix="(", array_suffix=")")
-    assert result == {"a(0)": "1", "a(1)": "2"}
+    assert result == {"a(0)": 1, "a(1)": 2}
 
 
 def test_max_depth():
@@ -159,7 +159,7 @@ def test_max_depth_preserves_shallow():
 
 def test_normalize_many():
     inputs = ['{"a":1}', '{"b":2}']
-    result = fjn.normalize_many(inputs)
+    result = fjn.normalize_many(inputs, preserve_types=False)
     assert len(result) == 2
     assert result[0] == {"a": "1"}
     assert result[1] == {"b": "2"}
@@ -174,7 +174,7 @@ def test_normalize_many_parallel_order():
 
 def test_normalize_many_with_options():
     inputs = ['{"a": {"b": 1}}', '{"c": {"d": 2}}']
-    result = fjn.normalize_many(inputs, sep="/")
+    result = fjn.normalize_many(inputs, sep="/", preserve_types=False)
     assert len(result) == 2
     assert "a/b" in result[0]
     assert result[0]["a/b"] == "1"
@@ -195,7 +195,7 @@ def test_stream_ndjson_basic():
         f.write(ndjson_data)
         path = f.name
     try:
-        results = list(fjn.stream_ndjson(path))
+        results = list(fjn.stream_ndjson(path, preserve_types=False))
         assert len(results) == 2
         assert results[0] == {"a": "1"}
         assert results[1] == {"b": "2"}
@@ -273,7 +273,7 @@ def test_stream_ndjson_strict_raises_on_bad_line():
     try:
         it = fjn.stream_ndjson(path, strict=True)
         # First line parses fine
-        assert next(it) == {"a": "1"}
+        assert next(it) == {"a": 1}
         # Second line is malformed — raises ValueError with line number
         with pytest.raises(ValueError) as exc_info:
             next(it)
@@ -289,8 +289,8 @@ def test_stream_ndjson_strict_correct_line_number():
         path = f.name
     try:
         it = fjn.stream_ndjson(path, strict=True)
-        assert next(it) == {"x": "1"}  # logical line 1 (file line 1)
-        assert next(it) == {"y": "2"}  # logical line 2 (blank skipped)
+        assert next(it) == {"x": 1}  # logical line 1 (file line 1)
+        assert next(it) == {"y": 2}  # logical line 2 (blank skipped)
         with pytest.raises(ValueError) as exc_info:
             next(it)
         assert "line 3" in str(exc_info.value)  # BAD_LINE is logical line 3
@@ -313,7 +313,7 @@ def test_stream_ndjson_non_strict_default():
 
 
 def test_normalize_one_accepts_bytes():
-    result = fjn.normalize_one(b'{"a": 1}')
+    result = fjn.normalize_one(b'{"a": 1}', preserve_types=False)
     assert result == {"a": "1"}
 
 
@@ -329,11 +329,16 @@ def test_preserve_types_numbers_booleans_null():
     assert result["n"] is None
 
 
-def test_preserve_types_disabled_returns_strings():
-    # По умолчанию (preserve_types=False) — всё остаётся строками
+def test_preserve_types_default_returns_native_types():
+    # По умолчанию (preserve_types=True) — нативные типы Python
     result = fjn.normalize_one('{"i":42,"b":true,"f":3.14}')
-    assert result == {"i": "42", "b": "true", "f": "3.14"}
+    assert result == {"i": 42, "b": True, "f": 3.14}
 
+
+def test_preserve_types_disabled_returns_strings():
+    # preserve_types=False — всё как строки
+    result = fjn.normalize_one('{"i":42,"b":true,"f":3.14}', preserve_types=False)
+    assert result == {"i": "42", "b": "true", "f": "3.14"}
 
 def test_normalize_many_preserve_types():
     inputs = ['{"id":1,"active":true}', '{"id":2,"active":false}']

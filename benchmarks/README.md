@@ -27,8 +27,8 @@ python -c "import rustjsonnorm; rustjsonnorm.normalize_many([f'{chr(123)}\"a\":{
 cd path/to/rustjsonnorm/benchmarks
 pytest test_benchmarks.py --benchmark-only \
     --benchmark-warmup=False \
-    --benchmark-min-rounds=10 --benchmark-max-rounds=200 \
-    --benchmark-min-time=0.2 -v -k "multithread or correctness"
+    --benchmark-min-rounds=10 \
+    --benchmark-min-time=0.2 -v -k "multithread"
 ```
 
 ### Single-threaded (algorithmic comparison)
@@ -37,20 +37,36 @@ pytest test_benchmarks.py --benchmark-only \
 cd path/to/rustjsonnorm/benchmarks
 RAYON_NUM_THREADS=1 pytest test_benchmarks.py --benchmark-only \
     --benchmark-warmup=False \
-    --benchmark-min-rounds=10 --benchmark-max-rounds=200 \
-    --benchmark-min-time=0.2 -v -k "singlethread or correctness"
+    --benchmark-min-rounds=10 \
+    --benchmark-min-time=0.2 -v -k "singlethread"
 ```
 
 ## Test categories
 
 | Group | Tests | What it measures |
 |---|---|---|
-| `*_symmetric` | Rust + Pandas on same JSON strings | Fair speed comparison |
 | `_singlethread` / `_multithread` | Isolated parallelism modes | Algorithmic vs real-world throughput |
-| `test_correctness_*` | Row-by-row key+value comparison | Output equivalence |
-| `test_stress_single_thread_sync` | Single-thread vs multi-thread output parity | Thread safety |
+| `*_symmetric` | Rust + Pandas on same JSON strings | Fair speed comparison (multi-threaded) |
+| `correctness_*`, `stress_*` | Row-by-row key+value comparison | Output equivalence |
 | `test_stream_ndjson_rust_huge` | Streaming NDJSON throughput | I/O-bound performance |
 | `test_options_*` | preserve_types, max_depth overheads | Feature cost |
+
+## Full run (all tests)
+
+```bash
+# Correctness checks (regular pytest, no benchmark calibration)
+python -m pytest test_benchmarks.py -k "correctness or stress" -v
+
+# Single-threaded benchmarks
+RAYON_NUM_THREADS=1 python -m pytest test_benchmarks.py --benchmark-only \
+    --benchmark-warmup=False --benchmark-min-rounds=10 --benchmark-min-time=0.2 \
+    -v -k "singlethread"
+
+# Multi-threaded benchmarks
+python -m pytest test_benchmarks.py --benchmark-only \
+    --benchmark-warmup=False --benchmark-min-rounds=10 --benchmark-min-time=0.2 \
+    -v -k "multithread"
+```
 
 ## Running on external datasets
 
