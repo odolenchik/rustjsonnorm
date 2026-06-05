@@ -1,4 +1,4 @@
-# rustjsonnorm
+# rustjsonnorm v0.2.1
 
 Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **4.3x faster** at scale.
 
@@ -50,8 +50,8 @@ for row in fjn.stream_ndjson("large_file.ndjson"):
 
 | Function | Description |
 |---|---|
-| `normalize_one(json_str, sep=".", array_prefix="[", array_suffix="]", max_depth=100)` | Flatten a single JSON string to a dict. Top-level must be an object. |
-| `normalize_many(json_strings, ...options)` | Parallel batch flatten. Returns list of dicts in input order. |
+| `normalize_one(json_input, sep=".", array_prefix="[", array_suffix="]", max_depth=100)` | Flatten a single JSON string or bytes to a dict. Top-level must be an object. Accepts `str` or `bytes`. |
+| `normalize_many(json_inputs, ...options)` | Parallel batch flatten. Accepts a list of strings or bytes per item. Returns list of dicts in input order. |
 | `stream_ndjson(filepath, ...options)` | Iterator that yields flattened dicts from a NDJSON file line-by-line. |
 
 ### Options (all functions)
@@ -129,7 +129,7 @@ for row in fjn.stream_ndjson("data.ndjson", strict=True):
 pytest tests/
 ```
 
-40 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, and strict-mode error handling.
+41 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, strict-mode error handling, and bytes input.
 
 ## License
 
