@@ -13,4 +13,4 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
-version = "0.2.1"
+version = "0.2.4"

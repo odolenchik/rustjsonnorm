@@ -146,12 +146,11 @@ fn string_to_pyobject(py: Python<'_>, s: &str) -> PyObject {
 }
 
 fn parse_and_flatten(
-    json_bytes: &[u8],
+    mut data: Vec<u8>,
     py: Python<'_>,
     opts: &FlattenOptions,
 ) -> PyResult<IndexMap<String, PyObject>> {
-    let mut data: Vec<u8> = json_bytes.to_vec();
-    let value = to_value(&mut data)
+    let value = to_value(data.as_mut_slice())
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
     if !matches!(value, Value::Object(_)) {
@@ -208,7 +207,8 @@ impl NdjsonIterator {
                 continue;
             }
             slf.line_num += 1;
-            match parse_and_flatten(trimmed.as_bytes(), py, &slf.opts) {
+            let trimmed_vec: Vec<u8> = trimmed.to_owned().into();
+            match parse_and_flatten(trimmed_vec, py, &slf.opts) {
                 Ok(map) => {
                     let dict = PyDict::new_bound(py);
                     for (k, v) in map {
@@ -283,7 +283,7 @@ fn normalize_one(
         return Err(pyo3::exceptions::PyTypeError::new_err("Expected str or bytes"));
     };
 
-    let result = parse_and_flatten(&json_bytes, py, &opts)?;
+    let result = parse_and_flatten(json_bytes, py, &opts)?;
 
     // Convert IndexMap<String, PyObject> to Python dict
     let py_dict = PyDict::new_bound(py);
@@ -338,29 +338,26 @@ fn normalize_many(
         .collect::<Result<Vec<_>, _>>()?;
 
    // Rayon phase: parse + flatten to string map (no GIL needed inside rayon)
-    let results: Vec<PyResult<(IndexMap<String, String>, bool)>> = owned_bytes
-        .par_iter()
-        .map(|bytes| {
-            let mut data = bytes.as_slice().to_vec();
-            let value = to_value(&mut data)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    // owned_bytes is consumed via into_par_iter() — no copies.
+    let results: Vec<PyResult<IndexMap<String, String>>> = owned_bytes.into_par_iter().map(|mut data| {
+        let value = to_value(data.as_mut_slice())
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
-            if !matches!(value, Value::Object(_)) {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    "Top-level JSON must be an object",
-                ));
-            }
+        if !matches!(value, Value::Object(_)) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Top-level JSON must be an object",
+            ));
+        }
 
-            let mut result = IndexMap::<String, String>::new();
-            flatten_json_to_strings(&value, "", &mut result, &opts, 0);
-            Ok((result, true))
-        })
-        .collect();
+        let mut result = IndexMap::<String, String>::new();
+        flatten_json_to_strings(&value, "", &mut result, &opts, 0);
+        Ok(result)
+    }).collect();
 
     // Convert string maps to Python dicts with proper types (holds GIL)
     let mut dicts: Vec<PyObject> = Vec::with_capacity(results.len());
     for result in results {
-        let (map, _ok) = result?;
+        let map = result?;
         let dict = PyDict::new_bound(py);
         if opts.preserve_types {
             for (k, v) in map {
