@@ -8,12 +8,27 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
+fn value_to_pyobject(py: Python<'_>, v: &Value<'_>) -> PyObject {
+    match v {
+        Value::String(s) => PyString::new_bound(py, s).into(),
+        Value::Static(node) => match node {
+            simd_json::StaticNode::Bool(b) => b.into_py(py),
+            simd_json::StaticNode::I64(n) => (*n).into_py(py),
+            simd_json::StaticNode::U64(n) => (*n).into_py(py),
+            simd_json::StaticNode::F64(n) => (*n).into_py(py),
+            simd_json::StaticNode::Null => py.None(),
+        },
+        _ => PyString::new_bound(py, "").into(),
+    }
+}
+
 #[derive(Clone)]
 struct FlattenOptions {
     sep: String,
     array_prefix: String,
     array_suffix: String,
     max_depth: usize,
+    preserve_types: bool,
 }
 
 impl Default for FlattenOptions {
@@ -23,11 +38,54 @@ impl Default for FlattenOptions {
             array_prefix: "[".to_string(),
             array_suffix: "]".to_string(),
             max_depth: 100,
+            preserve_types: false,
         }
     }
 }
 
 fn flatten_json(
+    value: &Value<'_>,
+    prefix: &str,
+    out: &mut IndexMap<String, PyObject>,
+    opts: &FlattenOptions,
+    py: Python<'_>,
+    depth: usize,
+) {
+    if depth >= opts.max_depth {
+        return;
+    }
+
+    match value {
+        Value::Object(obj) => {
+            for (k, v) in obj.iter() {
+                let new_prefix = if prefix.is_empty() {
+                    k.to_string()
+                } else {
+                    format!("{}{}{}", prefix, opts.sep, k)
+                };
+                flatten_json(v, &new_prefix, out, opts, py, depth + 1);
+            }
+        }
+        Value::Array(arr) => {
+            for (i, v) in arr.iter().enumerate() {
+                let new_prefix = format!(
+                    "{}{}{}{}",
+                    prefix, opts.array_prefix, i, opts.array_suffix
+                );
+                flatten_json(v, &new_prefix, out, opts, py, depth + 1);
+            }
+        }
+        _ => {
+            if opts.preserve_types {
+                out.insert(prefix.to_string(), value_to_pyobject(py, value));
+            } else {
+                out.insert(prefix.to_string(), PyString::new_bound(py, &value_to_string(value)).into());
+            }
+        }
+    }
+}
+
+fn flatten_json_to_strings(
     value: &Value<'_>,
     prefix: &str,
     out: &mut IndexMap<String, String>,
@@ -46,7 +104,7 @@ fn flatten_json(
                 } else {
                     format!("{}{}{}", prefix, opts.sep, k)
                 };
-                flatten_json(v, &new_prefix, out, opts, depth + 1);
+                flatten_json_to_strings(v, &new_prefix, out, opts, depth + 1);
             }
         }
         Value::Array(arr) => {
@@ -55,7 +113,7 @@ fn flatten_json(
                     "{}{}{}{}",
                     prefix, opts.array_prefix, i, opts.array_suffix
                 );
-                flatten_json(v, &new_prefix, out, opts, depth + 1);
+                flatten_json_to_strings(v, &new_prefix, out, opts, depth + 1);
             }
         }
         _ => {
@@ -64,10 +122,34 @@ fn flatten_json(
     }
 }
 
-fn process_one(
+fn string_to_pyobject(py: Python<'_>, s: &str) -> PyObject {
+    // Try to parse as a native type for preserve_types mode
+    if let Ok(n) = s.parse::<i64>() {
+        return n.into_py(py);
+    }
+    if let Ok(n) = s.parse::<u64>() {
+        return n.into_py(py);
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        return f.into_py(py);
+    }
+    if s == "true" {
+        return true.into_py(py);
+    }
+    if s == "false" {
+        return false.into_py(py);
+    }
+    if s == "null" {
+        return py.None();
+    }
+    PyString::new_bound(py, s).into()
+}
+
+fn parse_and_flatten(
     json_bytes: &[u8],
+    py: Python<'_>,
     opts: &FlattenOptions,
-) -> PyResult<IndexMap<String, String>> {
+) -> PyResult<IndexMap<String, PyObject>> {
     let mut data: Vec<u8> = json_bytes.to_vec();
     let value = to_value(&mut data)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
@@ -79,7 +161,7 @@ fn process_one(
     }
 
     let mut result = IndexMap::new();
-    flatten_json(&value, "", &mut result, opts, 0);
+    flatten_json(&value, "", &mut result, &opts, py, 0);
     Ok(result)
 }
 
@@ -126,7 +208,7 @@ impl NdjsonIterator {
                 continue;
             }
             slf.line_num += 1;
-            match process_one(trimmed.as_bytes(), &slf.opts) {
+            match parse_and_flatten(trimmed.as_bytes(), py, &slf.opts) {
                 Ok(map) => {
                     let dict = PyDict::new_bound(py);
                     for (k, v) in map {
@@ -150,24 +232,26 @@ impl NdjsonIterator {
 }
 
 #[pyfunction]
-#[pyo3(signature = (filepath, sep=None, array_prefix=None, array_suffix=None, max_depth=None, strict=None))]
-fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, array_suffix: Option<&str>, max_depth: Option<usize>, strict: Option<bool>) -> PyResult<NdjsonIterator> {
+#[pyo3(signature = (filepath, sep=None, array_prefix=None, array_suffix=None, max_depth=None, strict=None, preserve_types=None))]
+fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, array_suffix: Option<&str>, max_depth: Option<usize>, strict: Option<bool>, preserve_types: Option<bool>) -> PyResult<NdjsonIterator> {
     let mut opts = FlattenOptions::default();
     if let Some(s) = sep { opts.sep = s.to_string(); }
     if let Some(p) = array_prefix { opts.array_prefix = p.to_string(); }
     if let Some(s) = array_suffix { opts.array_suffix = s.to_string(); }
     if let Some(d) = max_depth { opts.max_depth = d; }
+    if let Some(pt) = preserve_types { opts.preserve_types = pt; }
     Ok(NdjsonIterator { reader: BufReader::new(File::open(filepath).map_err(|e| pyo3::exceptions::PyFileNotFoundError::new_err(e.to_string()))?), opts: Arc::new(opts), strict: strict.unwrap_or(false), line_num: 0 })
 }
 
 #[pyfunction]
-#[pyo3(signature = (json_input, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
+#[pyo3(signature = (json_input, sep=None, array_prefix=None, array_suffix=None, max_depth=None, preserve_types=None))]
 fn normalize_one(
     json_input: &Bound<'_, PyAny>,
     sep: Option<&str>,
     array_prefix: Option<&str>,
     array_suffix: Option<&str>,
     max_depth: Option<usize>,
+    preserve_types: Option<bool>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
     let mut opts = FlattenOptions::default();
@@ -182,6 +266,9 @@ fn normalize_one(
     }
     if let Some(d) = max_depth {
         opts.max_depth = d;
+    }
+    if let Some(pt) = preserve_types {
+        opts.preserve_types = pt;
     }
 
  // Accept either str or bytes as input — simd-json works on &[u8] regardless.
@@ -196,9 +283,9 @@ fn normalize_one(
         return Err(pyo3::exceptions::PyTypeError::new_err("Expected str or bytes"));
     };
 
-    let result = process_one(&json_bytes, &opts)?;
+    let result = parse_and_flatten(&json_bytes, py, &opts)?;
 
-    // Convert IndexMap<String, String> to Python dict
+    // Convert IndexMap<String, PyObject> to Python dict
     let py_dict = PyDict::new_bound(py);
     for (k, v) in result {
         py_dict.set_item(k, v)?;
@@ -207,13 +294,14 @@ fn normalize_one(
 }
 
 #[pyfunction]
-#[pyo3(signature = (json_inputs, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
+#[pyo3(signature = (json_inputs, sep=None, array_prefix=None, array_suffix=None, max_depth=None, preserve_types=None))]
 fn normalize_many(
     json_inputs: &Bound<'_, PyList>,
     sep: Option<&str>,
     array_prefix: Option<&str>,
     array_suffix: Option<&str>,
     max_depth: Option<usize>,
+    preserve_types: Option<bool>,
     py: Python<'_>,
 ) -> PyResult<PyObject> {
     let mut opts = FlattenOptions::default();
@@ -228,6 +316,9 @@ fn normalize_many(
     }
     if let Some(d) = max_depth {
         opts.max_depth = d;
+    }
+    if let Some(pt) = preserve_types {
+        opts.preserve_types = pt;
     }
 
   // Collect byte slices from PyList (accepts str or bytes per item) for rayon.
@@ -246,23 +337,44 @@ fn normalize_many(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let results: Vec<PyResult<IndexMap<String, String>>> = owned_bytes
+   // Rayon phase: parse + flatten to string map (no GIL needed inside rayon)
+    let results: Vec<PyResult<(IndexMap<String, String>, bool)>> = owned_bytes
         .par_iter()
-        .map(|bytes| process_one(bytes.as_slice(), &opts))
+        .map(|bytes| {
+            let mut data = bytes.as_slice().to_vec();
+            let value = to_value(&mut data)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+            if !matches!(value, Value::Object(_)) {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "Top-level JSON must be an object",
+                ));
+            }
+
+            let mut result = IndexMap::<String, String>::new();
+            flatten_json_to_strings(&value, "", &mut result, &opts, 0);
+            Ok((result, true))
+        })
         .collect();
 
-    // Convert all results to Python dicts in order
+    // Convert string maps to Python dicts with proper types (holds GIL)
     let mut dicts: Vec<PyObject> = Vec::with_capacity(results.len());
     for result in results {
-        let map = result?;
+        let (map, _ok) = result?;
         let dict = PyDict::new_bound(py);
-        for (k, v) in map {
-            dict.set_item(k, v)?;
+        if opts.preserve_types {
+            for (k, v) in map {
+                dict.set_item(k, string_to_pyobject(py, &v))?;
+            }
+        } else {
+            for (k, v) in map {
+                dict.set_item(k, v)?;
+            }
         }
         dicts.push(dict.into());
     }
 
- let result = PyList::empty_bound(py);
+    let result = PyList::empty_bound(py);
 for item in dicts {
     result.append(item)?;
 }

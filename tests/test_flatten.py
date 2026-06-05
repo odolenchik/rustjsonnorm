@@ -316,3 +316,80 @@ def test_normalize_one_accepts_bytes():
     result = fjn.normalize_one(b'{"a": 1}')
     assert result == {"a": "1"}
 
+
+def test_preserve_types_numbers_booleans_null():
+    result = fjn.normalize_one(
+        '{"s":"hi","i":42,"f":3.14,"b":true,"n":null}',
+        preserve_types=True,
+    )
+    assert result["s"] == "hi"
+    assert isinstance(result["i"], int) and result["i"] == 42
+    assert isinstance(result["f"], float) and abs(result["f"] - 3.14) < 1e-9
+    assert isinstance(result["b"], bool) and result["b"] is True
+    assert result["n"] is None
+
+
+def test_preserve_types_disabled_returns_strings():
+    # По умолчанию (preserve_types=False) — всё остаётся строками
+    result = fjn.normalize_one('{"i":42,"b":true,"f":3.14}')
+    assert result == {"i": "42", "b": "true", "f": "3.14"}
+
+
+def test_normalize_many_preserve_types():
+    inputs = ['{"id":1,"active":true}', '{"id":2,"active":false}']
+    results = fjn.normalize_many(inputs, preserve_types=True)
+    assert len(results) == 2
+    assert isinstance(results[0]["id"], int) and results[0]["id"] == 1
+    assert isinstance(results[0]["active"], bool) and results[0]["active"] is True
+    assert isinstance(results[1]["id"], int) and results[1]["id"] == 2
+    assert isinstance(results[1]["active"], bool) and results[1]["active"] is False
+
+
+def test_stream_ndjson_preserve_types():
+    ndjson_data = '{"x":42,"flag":true}\n{"y":"hello","z":-3.5}\n'
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+        f.write(ndjson_data)
+        path = f.name
+    try:
+        results = list(fjn.stream_ndjson(path, preserve_types=True))
+        assert len(results) == 2
+        assert isinstance(results[0]["x"], int) and results[0]["x"] == 42
+        assert isinstance(results[0]["flag"], bool) and results[0]["flag"] is True
+        assert isinstance(results[1]["y"], str) and results[1]["y"] == "hello"
+        assert isinstance(results[1]["z"], float) and results[1]["z"] == -3.5
+    finally:
+        os.unlink(path)
+
+
+def test_preserve_types_nested_arrays():
+    result = fjn.normalize_one(
+        '{"a": [1, true, null, 2.5]}',
+        preserve_types=True,
+    )
+    assert isinstance(result["a[0]"], int) and result["a[0]"] == 1
+    assert isinstance(result["a[1]"], bool) and result["a[1]"] is True
+    assert result["a[2]"] is None
+    assert isinstance(result["a[3]"], float) and result["a[3]"] == 2.5
+
+
+def test_preserve_types_null_string_not_converted():
+    # Строка "null" должна остаться строкой (не путать с JSON null)
+    result = fjn.normalize_one('{"x": null}', preserve_types=True)
+    assert result["x"] is None
+
+    result2 = fjn.normalize_one('{"x": "null"}', preserve_types=True)
+    assert isinstance(result2["x"], str) and result2["x"] == "null"
+
+
+def test_preserve_types_large_int():
+    # u64 и i64 должны корректно конвертироваться
+    result = fjn.normalize_one('{"a": 18446744073709551615}', preserve_types=True)
+    assert isinstance(result["a"], int) and result["a"] == 18446744073709551615
+
+    result2 = fjn.normalize_one('{"b": -9223372036854775808}', preserve_types=True)
+    assert isinstance(result2["b"], int) and result2["b"] == -9223372036854775808
+
+    # 123.0 — float, не int (JSON не различает целочисленные float и int)
+    result3 = fjn.normalize_one('{"c": 123.0}', preserve_types=True)
+    assert isinstance(result3["c"], float) and result3["c"] == 123.0
+

@@ -62,6 +62,18 @@ for row in fjn.stream_ndjson("large_file.ndjson"):
 | `array_prefix` | `"["` | Opening bracket for array indices |
 | `array_suffix` | `"]"` | Closing bracket for array indices |
 | `max_depth` | `100` | Stop recursing at this depth (leaf values converted to strings) |
+| `preserve_types` | `False` | When `True`, numeric and boolean JSON values are returned as native Python types (`int`, `float`, `bool`) instead of strings. `null` becomes `None`. |
+
+### Example: preserve original types
+
+```python
+result = fjn.normalize_one(
+    '{"age": 30, "active": true, "score": 95.5}',
+    preserve_types=True,
+)
+# {'age': 30, 'active': True, 'score': 95.5}
+# types are int, bool, float — not strings
+```
 
 ### Example: custom separator and depth limit
 
@@ -129,7 +141,7 @@ for row in fjn.stream_ndjson("data.ndjson", strict=True):
 pytest tests/
 ```
 
-41 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, strict-mode error handling, and bytes input.
+48 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, strict-mode error handling, bytes input, and type preservation.
 
 ## License
 
