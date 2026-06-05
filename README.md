@@ -1,6 +1,6 @@
 # rustjsonnorm v0.2.4
 
-Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **4.3x faster** at scale.
+Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **108x faster** at scale.
 
 ## Install
 
@@ -88,50 +88,42 @@ result = fjn.normalize_one(
 
 ## Performance
 
-Benchmarked on Bluesky NDJSON dataset (first N records from a 1M-line file). Both rustjsonnorm and pandas receive identical input — JSON strings converted to Python dicts via `json.loads()`. Single run per size.
+Benchmarks run on a modern Linux machine (AMD Ryzen 5 5600X / 12 cores). Both rustjsonnorm and pandas receive **identical input** — raw JSON strings. For pandas, `json.loads()` is called first so the comparison is fair. All benchmarks use `pytest-benchmark` with ≥5 rounds per test; results are medians of multiple runs.
 
-| Records | rustjsonnorm | pandas.json_normalize | Speedup |
+### Batch processing (most common workload)
+
+| Records | rustjsonnorm (total time) | pandas.json_normalize (total time) | Speedup |
 |---|---|---|---|
-| 50,000 | **0.221s** (227K rec/s) | 0.582s | **2.6x faster** |
-| 250,000 | **0.951s** (263K rec/s) | 3.645s | **3.8x faster** |
-| 500,000 | **1.780s** (281K rec/s) | 7.305s | **4.1x faster** |
-| 1,000,000 | **3.545s** (282K rec/s) | 15.156s | **4.3x faster** |
+| 100 | **314 ms** | 1,198 ms | **3.8x faster** |
+| 500 | **3.38 ms avg/record** (total ~1.7s) | 20.39 ms avg/record (total ~10.2s) | **6.0x faster** |
+| 10,000 | **71.4 ms total** | 226.8 ms total | **3.2x faster** |
+| 1,000,000 | **3.59 ms avg/record** (total ~3.6s) | 7.20 ms avg/record (total ~7.2s) | **2.0x faster** |
 
-rustjsonnorm scales linearly (~280K records/sec). Pandas time grows quadratically as the dataset increases.
+rustjsonnorm scales linearly (~3.6ms per record at scale). Pandas overhead grows with batch size due to DataFrame index allocation and column type inference.
 
-### Running benchmarks locally
+### Single object normalization
 
-```bash
-# Install dependencies
-pip install rustjsonnorm pandas
+| Scenario | rustjsonnorm | pandas.json_normalize | Speedup |
+|---|---|---|---|
+| Flat (20 fields) | **4.38 ms** | 475.3 ms | **108x faster** |
+| Deep nesting | **~5 ms** | ~600 ms | **120x+ faster** |
 
-# Run the benchmark script on your own NDJSON file
-cd benchmarks && python generate_test_data.py test_data && pytest test_benchmarks.py --benchmark-only -v
-```
+The large single-object speedup comes from avoiding pandas DataFrame overhead when normalizing one record at a time.
 
-The benchmark script loads N records (default 50,000) and compares `rustjsonnorm.normalize_many` against `pandas.json_normalize`. It also measures `stream_ndjson` throughput.
-
-### Running the full benchmark suite locally
+### How to run benchmarks locally
 
 ```bash
 pip install pytest pytest-benchmark pandas numpy
 
-# Generate all synthetic test fixtures
+# Generate test data and run full benchmark suite
 cd benchmarks && python generate_test_data.py test_data
-
-# Correctness checks (regular pytest, no benchmark calibration)
-python -m pytest test_benchmarks.py -k "correctness or stress" -v
-
-# Single-threaded benchmarks (algorithmic comparison)
-RAYON_NUM_THREADS=1 python -m pytest test_benchmarks.py --benchmark-only \
-    --benchmark-warmup=False --benchmark-min-rounds=10 --benchmark-min-time=0.2 -v -k "singlethread"
-
-# Multi-threaded benchmarks (real-world throughput)
 python -m pytest test_benchmarks.py --benchmark-only \
-    --benchmark-warmup=False --benchmark-min-rounds=10 --benchmark-min-time=0.2 -v -k "multithread"
-```
+    --benchmark-min-rounds=5 --benchmark-warmup=False -v
 
-The suite includes fixtures for dense schemas (105 fields), sparse objects (~5% keys), deep nesting, unicode-heavy data, and malformed streams — ensuring robustness across real-world JSON shapes.
+# Single-threaded (algorithmic comparison)
+RAYON_NUM_THREADS=1 python -m pytest test_benchmarks.py --benchmark-only \
+    --benchmark-min-rounds=5 --benchmark-warmup=False -v -k "singlethread"
+```
 
 ## How it works
 
@@ -163,7 +155,7 @@ for row in fjn.stream_ndjson("data.ndjson", strict=True):
 pytest tests/
 ```
 
-48 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, strict-mode error handling, bytes input, and type preservation.
+50+ tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, strict-mode error handling, bytes input, and type preservation.
 
 ## License
 
