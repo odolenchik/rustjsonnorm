@@ -1,3 +1,5 @@
+#![allow(clippy::useless_conversion)]
+
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList, PyString};
 use simd_json::borrowed::{to_value, Value};
@@ -160,7 +162,7 @@ fn parse_and_flatten(
     }
 
     let mut result = IndexMap::new();
-    flatten_json(&value, "", &mut result, &opts, py, 0);
+    flatten_json(&value, "", &mut result, opts, py, 0);
     Ok(result)
 }
 
@@ -233,6 +235,7 @@ impl NdjsonIterator {
 
 #[pyfunction]
 #[pyo3(signature = (filepath, sep=None, array_prefix=None, array_suffix=None, max_depth=None, strict=None, preserve_types=None))]
+#[allow(clippy::useless_conversion)]
 fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, array_suffix: Option<&str>, max_depth: Option<usize>, strict: Option<bool>, preserve_types: Option<bool>) -> PyResult<NdjsonIterator> {
     let mut opts = FlattenOptions::default();
     if let Some(s) = sep { opts.sep = s.to_string(); }
@@ -245,6 +248,7 @@ fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, 
 
 #[pyfunction]
 #[pyo3(signature = (json_input, sep=None, array_prefix=None, array_suffix=None, max_depth=None, preserve_types=None))]
+#[allow(clippy::useless_conversion)]
 fn normalize_one(
     json_input: &Bound<'_, PyAny>,
     sep: Option<&str>,
@@ -295,6 +299,7 @@ fn normalize_one(
 
 #[pyfunction]
 #[pyo3(signature = (json_inputs, sep=None, array_prefix=None, array_suffix=None, max_depth=None, preserve_types=None))]
+#[allow(clippy::useless_conversion)]
 fn normalize_many(
     json_inputs: &Bound<'_, PyList>,
     sep: Option<&str>,
