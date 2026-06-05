@@ -8,9 +8,18 @@ dynamic = ["version"]
 description = "Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for pandas.json_normalize — up to 4.3x faster at scale."
 readme = "README.md"
 license = {text = "MIT"}
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
-version = "0.2.4"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]

@@ -218,7 +218,7 @@ impl NdjsonIterator {
                 }
                 Err(e) if slf.strict => {
                     // In strict mode, include line number in the error message.
-                    let msg = format!("line {}: {}", slf.line_num, e.to_string());
+                    let msg = format!("line {}: {}", slf.line_num, &e);
                     return Err(pyo3::exceptions::PyValueError::new_err(msg));
                 }
                 Err(_) => continue, // skip malformed lines (non-strict)

@@ -106,7 +106,7 @@ rustjsonnorm scales linearly (~280K records/sec). Pandas time grows quadraticall
 pip install rustjsonnorm pandas
 
 # Run the benchmark script on your own NDJSON file
-python benchmarks/bench.py path/to/data.ndjson
+cd benchmarks && python generate_test_data.py test_data && pytest test_benchmarks.py --benchmark-only -v
 ```
 
 The benchmark script loads N records (default 50,000) and compares `rustjsonnorm.normalize_many` against `pandas.json_normalize`. It also measures `stream_ndjson` throughput.
