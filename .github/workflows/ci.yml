@@ -15,6 +15,23 @@ jobs:
       - name: Clippy
         run: cargo clippy -- -D warnings
 
+  lint-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint and format check (ruff)
+        run: |
+          pip install ruff
+          # Only lint our package Python files, not the entire llama.cpp repo
+          ruff check tests/test_flatten.py tests/test_correctness.py benchmarks/generate_test_data.py benchmarks/test_benchmarks.py
+          ruff format --check --extension py:python tests/ benchmarks/
+
   test:
     strategy:
       matrix:
@@ -23,11 +40,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: pip install maturin pytest pandas
+        run: pip install maturin pytest pandas coverage
       - name: Build wheel
         run: maturin build --release --out dist --find-interpreter
       - name: Install wheel
@@ -35,5 +53,5 @@ jobs:
         run: |
           WHEEL=$(ls dist/*.whl | head -1)
           pip install "$WHEEL"
-      - name: Run tests
-        run: pytest tests/
+      - name: Run tests with coverage
+        run: pytest tests/ --cov rustjsonnorm --cov-report=term-missing

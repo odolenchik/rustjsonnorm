@@ -37,6 +37,7 @@ def _set_rayon_threads(n: int):
 # Shared fixtures — load data once per session, always as JSON strings + dicts
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def single_objects():
     """Load each single-object file as (json_string, python_dict)."""
@@ -143,6 +144,7 @@ def unicode_heavy_data():
 # Parallelism control helpers
 # ---------------------------------------------------------------------------
 
+
 def _check_parallelism(mode: str):
     """Skip test if parallelism mode doesn't match expected.
 
@@ -162,12 +164,14 @@ def _check_parallelism(mode: str):
 # Both Rust and pandas get the same raw JSON string.
 # ---------------------------------------------------------------------------
 
+
 def test_normalize_one_rust_flat(benchmark, single_objects):
     """Benchmark rustjsonnorm.normalize_one on flat object."""
     json_str, _ = single_objects["flat"]
 
     def run():
         import rustjsonnorm as fjn
+
         return fjn.normalize_one(json_str)
 
     result = benchmark(run)
@@ -179,6 +183,7 @@ def test_normalize_one_pandas_flat(benchmark, single_objects):
 
     def run():
         import pandas as pd
+
         return pd.json_normalize(json.loads(json_str))
 
     result = benchmark(run)
@@ -190,6 +195,7 @@ def test_normalize_one_rust_nested_deep(benchmark, single_objects):
 
     def run():
         import rustjsonnorm as fjn
+
         return fjn.normalize_one(json_str)
 
     result = benchmark(run)
@@ -201,6 +207,7 @@ def test_normalize_one_pandas_nested_deep(benchmark, single_objects):
 
     def run():
         import pandas as pd
+
         return pd.json_normalize(json.loads(json_str))
 
     result = benchmark(run)
@@ -211,9 +218,11 @@ def test_normalize_one_pandas_nested_deep(benchmark, single_objects):
 # Both Rust and pandas start from raw JSON strings.
 # ---------------------------------------------------------------------------
 
+
 def _rust_normalize_many_from_strings(json_strs):
     """Rust path: parse JSON + flatten."""
     import rustjsonnorm as fjn
+
     return fjn.normalize_many(json_strs)
 
 
@@ -241,6 +250,7 @@ def test_normalize_many_pandas_small_symmetric(benchmark, batch_data):
         # Symmetric: parse all JSON first, then normalize
         dicts = [json.loads(s) for s in json_strs]
         import pandas
+
         return pandas.json_normalize(dicts)
 
     result = benchmark(run)
@@ -269,6 +279,7 @@ def test_normalize_many_pandas_medium_symmetric(benchmark, batch_data):
     def run():
         dicts = [json.loads(s) for s in json_strs]
         import pandas
+
         return pandas.json_normalize(dicts)
 
     result = benchmark(run)
@@ -297,6 +308,7 @@ def test_normalize_many_pandas_large_symmetric(benchmark, batch_data):
     def run():
         dicts = [json.loads(s) for s in json_strs]
         import pandas
+
         return pandas.json_normalize(dicts)
 
     result = benchmark(run)
@@ -308,6 +320,7 @@ def test_normalize_many_rust_1m(benchmark, large_batch_1m):
 
     def run():
         import rustjsonnorm as fjn
+
         return fjn.normalize_many(json_strs)
 
     result = benchmark(run)
@@ -320,6 +333,7 @@ def test_normalize_many_pandas_1m(benchmark, large_batch_1m):
     def run():
         dicts = [json.loads(s) for s in json_strs]
         import pandas
+
         return pandas.json_normalize(dicts)
 
     result = benchmark(run)
@@ -329,6 +343,7 @@ def test_normalize_many_pandas_1m(benchmark, large_batch_1m):
 # Single-threaded benchmarks — fair algorithmic comparison (RAYON_NUM_THREADS=1)
 # Must be run in a separate process.
 # ---------------------------------------------------------------------------
+
 
 def test_normalize_many_rust_small_singlethread(benchmark, batch_data):
     """Single-threaded Rust normalize_many on small batch."""
@@ -377,6 +392,7 @@ def test_normalize_many_rust_large_singlethread(benchmark, batch_data):
 # Must be run without RAYON_NUM_THREADS set (or > 1).
 # ---------------------------------------------------------------------------
 
+
 def test_normalize_many_rust_small_multithread(benchmark, batch_data):
     """Multi-threaded Rust normalize_many on small batch."""
     if "small_batch" not in batch_data:
@@ -423,6 +439,7 @@ def test_normalize_many_rust_large_multithread(benchmark, batch_data):
 # stream_ndjson benchmarks — rust only (pandas read_json doesn't flatten)
 # ---------------------------------------------------------------------------
 
+
 def test_stream_ndjson_rust_huge(benchmark):
     """Benchmark rustjsonnorm.stream_ndjson on huge batch."""
     stream_file = os.path.join(TEST_DATA_DIR, "huge_batch.ndjson")
@@ -442,6 +459,7 @@ def test_stream_ndjson_rust_huge(benchmark):
 # Options benchmarks (rust-only, measure overhead of each option)
 # ---------------------------------------------------------------------------
 
+
 def test_options_preserve_types(benchmark):
     """Measure the overhead of preserve_types=True vs string conversion."""
     parts = []
@@ -451,6 +469,7 @@ def test_options_preserve_types(benchmark):
 
     def run():
         import rustjsonnorm as fjn
+
         return fjn.normalize_one(json_str, preserve_types=True)
 
     result = benchmark(run)
@@ -459,10 +478,11 @@ def test_options_preserve_types(benchmark):
 def test_options_max_depth(benchmark):
     """Measure the overhead of max_depth limiting."""
     inner = '"value":1'
-    json_str = '{"a":{"b":{"c":{' + inner + '}}}}'
+    json_str = '{"a":{"b":{"c":{' + inner + "}}}}"
 
     def run():
         import rustjsonnorm as fjn
+
         return fjn.normalize_one(json_str, max_depth=2)
 
     result = benchmark(run)
@@ -472,12 +492,15 @@ def test_options_max_depth(benchmark):
 # Benchmarks: new fixture types (dense, sparse, deep, unicode)
 # ---------------------------------------------------------------------------
 
+
 def test_normalize_many_dense_multithread(benchmark, dense_schema):
     """Multi-threaded Rust normalize_many on dense-schema data."""
     json_strs, _ = dense_schema
     _check_parallelism("multi")
+
     def run():
         return _rust_normalize_many_from_strings(json_strs)
+
     benchmark(run)
 
 
@@ -485,8 +508,10 @@ def test_normalize_many_dense_singlethread(benchmark, dense_schema):
     """Single-threaded Rust normalize_many on dense-schema data."""
     json_strs, _ = dense_schema
     _check_parallelism("single")
+
     def run():
         return _rust_normalize_many_from_strings(json_strs)
+
     benchmark(run)
 
 
@@ -494,8 +519,10 @@ def test_normalize_many_sparse_multithread(benchmark, sparse_schema):
     """Multi-threaded Rust normalize_many on sparse-schema data."""
     json_strs, _ = sparse_schema
     _check_parallelism("multi")
+
     def run():
         return _rust_normalize_many_from_strings(json_strs)
+
     benchmark(run)
 
 
@@ -503,8 +530,10 @@ def test_normalize_many_sparse_singlethread(benchmark, sparse_schema):
     """Single-threaded Rust normalize_many on sparse-schema data."""
     json_strs, _ = sparse_schema
     _check_parallelism("single")
+
     def run():
         return _rust_normalize_many_from_strings(json_strs)
+
     benchmark(run)
 
 
@@ -512,9 +541,12 @@ def test_normalize_one_deep_singlethread(benchmark, deep_nesting_data):
     """Single-threaded normalize_one on deeply nested object."""
     json_str = deep_nesting_data[0][0]  # first JSON string only (single object per record)
     _check_parallelism("single")
+
     def run():
         import rustjsonnorm as fjn
+
         return fjn.normalize_one(json_str)
+
     benchmark(run)
 
 
@@ -522,8 +554,10 @@ def test_normalize_many_unicode_multithread(benchmark, unicode_heavy_data):
     """Multi-threaded Rust normalize_many on unicode-heavy data."""
     json_strs, _ = unicode_heavy_data
     _check_parallelism("multi")
+
     def run():
         return _rust_normalize_many_from_strings(json_strs)
+
     benchmark(run)
 
 
@@ -531,6 +565,8 @@ def test_normalize_many_unicode_multithread(benchmark, unicode_heavy_data):
 # Helper function for stream_ndjson
 # ---------------------------------------------------------------------------
 
+
 def rustjsonnorm_stream_ndjson(stream_file):
     import rustjsonnorm as fjn
+
     return fjn.stream_ndjson(stream_file)

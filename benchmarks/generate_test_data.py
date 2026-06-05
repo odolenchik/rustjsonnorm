@@ -8,7 +8,7 @@ import sys
 
 
 def rand_str(length: int = 10) -> str:
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
 def flat_object(n_keys: int = 20) -> dict:
@@ -79,13 +79,13 @@ def mixed_object(depth: int = 3) -> dict:
     obj["config"] = {
         "enabled": random.choice([True, False]),
         "region": rand_str(3).upper(),
-        "version": f"{random.randint(1,5)}.{random.randint(0,9)}",
+        "version": f"{random.randint(1, 5)}.{random.randint(0, 9)}",
         "tags": [rand_str(6) for _ in range(random.randint(2, 8))],
     }
 
     # Deep nesting
     deep = obj
-    for d in range(depth):
+    for _i in range(depth):
         new_level = {}
         for k in ["meta", "stats"]:
             new_level[k] = {
@@ -152,7 +152,8 @@ def generate_batch_datasets(output_dir: str):
     print("Generated batch datasets:")
     for name in sorted(os.listdir(output_dir)):
         path = os.path.join(output_dir, name)
-        lines = sum(1 for _ in open(path))
+        with open(path) as f:
+            lines = sum(1 for _ in f)
         size_kb = os.path.getsize(path) / 1024
         print(f"  {name}: {lines} records ({size_kb:.0f} KB)")
 
@@ -179,13 +180,15 @@ def generate_corrupt_stream(output_dir: str, total_lines: int = 50_000):
             f.write(line + "\n")
 
     size_kb = os.path.getsize(path) / 1024
-    actual_bad = sum(1 for l in open(path) if not _is_valid_json_line(l.strip()))
+    with open(path) as f:
+        actual_bad = sum(1 for line in f if not _is_valid_json_line(line.strip()))
     print(f"Generated corrupt_stream.ndjson: {total_lines} lines ({size_kb:.0f} KB, ~{actual_bad} bad)")
 
 
 # ---------------------------------------------------------------------------
 # New fixture generators (dense, sparse, deep, unicode, malformed)
 # ---------------------------------------------------------------------------
+
 
 def dense_schema_object(n_fields: int = 105) -> dict:
     """Flat object with 100+ fields — tests column allocation and indexmap traversal."""
@@ -291,11 +294,15 @@ def generate_malformed_stream(output_dir: str, total_lines: int = 100_000):
     path = os.path.join(output_dir, "malformed_stream.ndjson")
 
     bad_templates = [
-        "NOT_JSON", "", "{invalid}", '{"incomplete":', "{{}",
+        "NOT_JSON",
+        "",
+        "{invalid}",
+        '{"incomplete":',
+        "{{}",
         '{"key": "value\x00with\x07control"}',  # control chars
-        '{"key": "unescaped"quote}',              # unescaped quote in value
-        '{truly broken json!!!',                   # gibberish object
-        'null\n123\ntrue',                         # multiple non-objects on one line (counted once)
+        '{"key": "unescaped"quote}',  # unescaped quote in value
+        "{truly broken json!!!",  # gibberish object
+        "null\n123\ntrue",  # multiple non-objects on one line (counted once)
     ]
     bad_count = max(1, int(total_lines * 0.01))
     good_count = total_lines - bad_count
@@ -312,7 +319,8 @@ def generate_malformed_stream(output_dir: str, total_lines: int = 100_000):
             f.write(line + "\n")
 
     size_mb = os.path.getsize(path) / (1024 * 1024)
-    actual_bad = sum(1 for l in open(path) if not _is_valid_json_line(l.strip()))
+    with open(path) as f:
+        actual_bad = sum(1 for line in f if not _is_valid_json_line(line.strip()))
     print(f"Generated malformed_stream.ndjson: {total_lines} lines ({size_mb:.1f} MB, ~{actual_bad} bad)")
 
 
@@ -328,8 +336,13 @@ def generate_extra_fixtures(output_dir: str):
     generate_malformed_stream(output_dir, total_lines=100_000)
 
     print("\nGenerated extra fixtures:")
-    for name in ["dense_schema.ndjson", "sparse_schema.ndjson", "deep_nesting.ndjson",
-                  "unicode_heavy.ndjson", "malformed_stream.ndjson"]:
+    for name in [
+        "dense_schema.ndjson",
+        "sparse_schema.ndjson",
+        "deep_nesting.ndjson",
+        "unicode_heavy.ndjson",
+        "malformed_stream.ndjson",
+    ]:
         path = os.path.join(output_dir, name)
         if os.path.exists(path):
             size_mb = os.path.getsize(path) / (1024 * 1024)

@@ -1,11 +1,12 @@
+import os
+import tempfile
+
 import pytest
 import rustjsonnorm as fjn
-import tempfile
-import os
 
 
 def test_empty_object():
-    assert fjn.normalize_one('{}') == {}
+    assert fjn.normalize_one("{}") == {}
 
 
 def test_empty_array():
@@ -28,7 +29,7 @@ def test_key_with_separator_collision():
 
 def test_key_equals_sep():
     # sep="/", ключ тоже "/" — не должен быть разбит на части
-    result = fjn.normalize_one('{"a/b": 42}', sep="/" )
+    result = fjn.normalize_one('{"a/b": 42}', sep="/")
     assert "a/b" in result
     assert result["a/b"] == 42
     # И нет ключей "a" или "b"
@@ -61,7 +62,7 @@ def test_mixed_types_in_array():
 
 
 def test_large_string_value():
-    big = '{"msg": "' + 'x' * (500 * 1024) + '"}'  # ~500KB string
+    big = '{"msg": "' + "x" * (500 * 1024) + '"}'  # ~500KB string
     result = fjn.normalize_one(big)
     assert "msg" in result
     assert len(result["msg"]) == 500 * 1024
@@ -75,7 +76,7 @@ def test_normalize_many_empty_list():
 def test_normalize_many_with_invalid_entry():
     # пустая строка — невалидный JSON, должен бросить ValueError на этой записи
     with pytest.raises(ValueError):
-        fjn.normalize_many(['{"a":1}', ''])
+        fjn.normalize_many(['{"a":1}', ""])
 
 
 def test_all_primitive_types_flat():
@@ -107,7 +108,7 @@ def test_string_value():
 
 def test_invalid_json():
     with pytest.raises(ValueError):
-        fjn.normalize_one('{invalid}')
+        fjn.normalize_one("{invalid}")
 
 
 def test_array_primitives():
@@ -121,7 +122,7 @@ def test_nested_arrays():
 
 
 def test_array_of_objects():
-    result = fjn.normalize_one('{"a": [{"b": 1}, {"b": 2}]}' , preserve_types=False)
+    result = fjn.normalize_one('{"a": [{"b": 1}, {"b": 2}]}', preserve_types=False)
     assert result == {"a[0].b": "1", "a[1].b": "2"}
 
 
@@ -191,7 +192,7 @@ def test_normalize_many_preserves_order():
 
 def test_stream_ndjson_basic():
     ndjson_data = '{"a": 1}\n{"b": 2}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -204,7 +205,7 @@ def test_stream_ndjson_basic():
 
 
 def test_stream_ndjson_empty_file():
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         path = f.name
     try:
         results = list(fjn.stream_ndjson(path))
@@ -215,7 +216,7 @@ def test_stream_ndjson_empty_file():
 
 def test_stream_ndjson_skips_blank_lines():
     ndjson_data = '{"a": 1}\n\n{"b": 2}\n\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -227,7 +228,7 @@ def test_stream_ndjson_skips_blank_lines():
 
 def test_stream_ndjson_with_options():
     ndjson_data = '{"a": {"b": 1}}\n{"c": {"d": 2}}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -241,7 +242,7 @@ def test_stream_ndjson_with_options():
 
 def test_stream_ndjson_skips_bad_lines():
     ndjson_data = '{"a": 1}\nNOT_JSON\n{"b": 2}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -254,7 +255,7 @@ def test_stream_ndjson_skips_bad_lines():
 
 def test_stream_ndjson_max_depth():
     ndjson_data = '{"x": {"y": {"z": 42}}}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -267,7 +268,7 @@ def test_stream_ndjson_max_depth():
 
 def test_stream_ndjson_strict_raises_on_bad_line():
     ndjson_data = '{"a": 1}\nNOT_JSON\n{"b": 2}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -284,7 +285,7 @@ def test_stream_ndjson_strict_raises_on_bad_line():
 
 def test_stream_ndjson_strict_correct_line_number():
     ndjson_data = '{"x": 1}\n\n{"y": 2}\nBAD_LINE\n{"z": 3}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -301,7 +302,7 @@ def test_stream_ndjson_strict_correct_line_number():
 def test_stream_ndjson_non_strict_default():
     # Default (non-strict) should still skip bad lines silently
     ndjson_data = '{"a": 1}\nBAD\n{"b": 2}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -309,7 +310,6 @@ def test_stream_ndjson_non_strict_default():
         assert len(results) == 2
     finally:
         os.unlink(path)
-
 
 
 def test_normalize_one_accepts_bytes():
@@ -340,6 +340,7 @@ def test_preserve_types_disabled_returns_strings():
     result = fjn.normalize_one('{"i":42,"b":true,"f":3.14}', preserve_types=False)
     assert result == {"i": "42", "b": "true", "f": "3.14"}
 
+
 def test_normalize_many_preserve_types():
     inputs = ['{"id":1,"active":true}', '{"id":2,"active":false}']
     results = fjn.normalize_many(inputs, preserve_types=True)
@@ -352,7 +353,7 @@ def test_normalize_many_preserve_types():
 
 def test_stream_ndjson_preserve_types():
     ndjson_data = '{"x":42,"flag":true}\n{"y":"hello","z":-3.5}\n'
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False) as f:
         f.write(ndjson_data)
         path = f.name
     try:
@@ -397,4 +398,3 @@ def test_preserve_types_large_int():
     # 123.0 — float, не int (JSON не различает целочисленные float и int)
     result3 = fjn.normalize_one('{"c": 123.0}', preserve_types=True)
     assert isinstance(result3["c"], float) and result3["c"] == 123.0
-

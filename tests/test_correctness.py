@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 
 import pytest
-
 import rustjsonnorm as fjn
 
 TEST_DATA_DIR = str(Path(__file__).parent.parent / "benchmarks" / "test_data")
@@ -22,6 +21,7 @@ TEST_DATA_DIR = str(Path(__file__).parent.parent / "benchmarks" / "test_data")
 # ---------------------------------------------------------------------------
 # Fixtures — load data once per session, always as JSON strings + dicts
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def single_objects():
@@ -124,6 +124,7 @@ def malformed_stream_file():
 # Correctness helpers — compare every key and value
 # ---------------------------------------------------------------------------
 
+
 def _normalise_value(v):
     """Normalise a value to a comparable string."""
     import numpy as np
@@ -136,7 +137,7 @@ def _normalise_value(v):
         return str(bool(v)).lower()  # Rust true/false vs Python True/False
 
     # For any numeric type that has .item(), convert to native Python first
-    if hasattr(v, 'item'):
+    if hasattr(v, "item"):
         v = v.item()
 
     # Now handle native Python types
@@ -146,6 +147,7 @@ def _normalise_value(v):
         # Use Decimal for consistent float formatting across rust/pandas output
         if isinstance(v, float):
             from decimal import Decimal
+
             return str(Decimal(str(v)))
         return str(v)
 
@@ -155,6 +157,7 @@ def _normalise_value(v):
     try:
         i = int(s)
         from decimal import Decimal
+
         return str(Decimal(str(i)))
     except (ValueError, TypeError):
         pass
@@ -162,6 +165,7 @@ def _normalise_value(v):
     try:
         f = float(s)
         from decimal import Decimal
+
         return str(Decimal(str(f)))
     except (ValueError, TypeError):
         pass
@@ -171,10 +175,9 @@ def _normalise_value(v):
 
 def _assert_keys_compatible(rust_keys: set[str], pandas_cols: set[str], test_name: str):
     """Check that rust and pandas produce compatible key sets."""
-    non_array_rust = {k for k in rust_keys if '[' not in k}
+    non_array_rust = {k for k in rust_keys if "[" not in k}
     missing_from_pandas = non_array_rust - pandas_cols
-    assert not missing_from_pandas, \
-        f"{test_name}: rust non-array keys missing from pandas: {missing_from_pandas}"
+    assert not missing_from_pandas, f"{test_name}: rust non-array keys missing from pandas: {missing_from_pandas}"
 
 
 def _compare_results(rust_results: list[dict], pandas_df, test_name: str = ""):
@@ -187,8 +190,9 @@ def _compare_results(rust_results: list[dict], pandas_df, test_name: str = ""):
     else:
         raise ValueError(f"Unexpected type for pandas result: {type(pandas_df)}")
 
-    assert len(rust_results) == num_rows, \
+    assert len(rust_results) == num_rows, (
         f"{test_name}: row count mismatch rust={len(rust_results)} vs pandas={num_rows}"
+    )
 
     has_variable_schema = False
     if len(rust_results) >= 2:
@@ -207,17 +211,18 @@ def _compare_results(rust_results: list[dict], pandas_df, test_name: str = ""):
 
             # Handle array notation: rust has 'config.tags[0]' while pandas may have just 'config.tags'.
             for k in rust_row:
-                if '[' not in k:
-                    assert k in pandas_row, \
-                        f"{test_name}: row {i}, key '{k}' missing from pandas"
+                if "[" not in k:
+                    assert k in pandas_row, f"{test_name}: row {i}, key '{k}' missing from pandas"
                     rust_val = _normalise_value(rust_row[k])
                     pandas_val = _normalise_value(pandas_row.get(k))
-                    assert rust_val == pandas_val, \
+                    assert rust_val == pandas_val, (
                         f"{test_name}: row {i}, key '{k}': rust={rust_val!r} vs pandas={pandas_val!r}"
+                    )
                 else:
-                    base_key = k.rsplit('[', 1)[0]
-                    assert base_key in pandas_row, \
+                    base_key = k.rsplit("[", 1)[0]
+                    assert base_key in pandas_row, (
                         f"{test_name}: row {i}, array key '{k}' has no parent '{base_key}' in pandas"
+                    )
     else:
         # Global comparison for fixed-schema datasets
         rust_keys = set()
@@ -234,24 +239,28 @@ def _compare_results(rust_results: list[dict], pandas_df, test_name: str = ""):
                 if isinstance(v, float) and pd.isna(v):
                     pandas_row[k] = None
 
-            rust_non_array = {k: v for k, v in rust_row.items() if '[' not in k}
-            pandas_non_array = {k: v for k, v in pandas_row.items() if '[' not in k and f'{k}[0]' not in rust_row}
+            rust_non_array = {k: v for k, v in rust_row.items() if "[" not in k}
+            pandas_non_array = {k: v for k, v in pandas_row.items() if "[" not in k and f"{k}[0]" not in rust_row}
 
-            assert rust_non_array.keys() == pandas_non_array.keys(), \
-                f"{test_name}: row {i} non-array key mismatch — rust={set(rust_non_array.keys())} vs pandas={set(pandas_non_array.keys())}"
+            assert rust_non_array.keys() == pandas_non_array.keys(), (
+                f"{test_name}: row {i} non-array key mismatch — "
+                f"rust={set(rust_non_array.keys())} vs pandas={set(pandas_non_array.keys())}"
+            )
 
             for k in rust_non_array:
                 rust_val = _normalise_value(rust_row[k])
                 pandas_val = _normalise_value(pandas_row.get(k))
                 if isinstance(pandas_row.get(k), float) and pd.isna(pandas_row.get(k)):
                     pandas_val = "null"
-                assert rust_val == pandas_val, \
+                assert rust_val == pandas_val, (
                     f"{test_name}: row {i}, key '{k}': rust={rust_val!r} vs pandas={pandas_val!r}"
+                )
 
 
 def _rust_normalize_many_from_strings(json_strs):
     """Rust path: parse JSON + flatten."""
     import rustjsonnorm as fjn
+
     return fjn.normalize_many(json_strs)
 
 
@@ -259,15 +268,16 @@ def _rust_normalize_many_from_strings(json_strs):
 # Correctness tests — Rust vs Pandas comparison
 # ---------------------------------------------------------------------------
 
+
 def test_correctness_rust_vs_pandas_small(batch_data):
     """Rust normalize_many and pandas json_normalize produce identical results."""
     if "small_batch" not in batch_data:
         pytest.skip("small_batch.ndjson not found")
+    pd = pytest.importorskip("pandas")
     json_strs, _ = batch_data["small_batch"]
 
     rust_results = list(_rust_normalize_many_from_strings(json_strs))
 
-    import pandas as pd
     dicts = [json.loads(s) for s in json_strs]
     pandas_df = pd.json_normalize(dicts)
 
@@ -278,11 +288,11 @@ def test_correctness_rust_vs_pandas_medium(batch_data):
     """Rust normalize_many and pandas json_normalize produce identical results."""
     if "medium_batch" not in batch_data:
         pytest.skip("medium_batch.ndjson not found")
+    pd = pytest.importorskip("pandas")
     json_strs, _ = batch_data["medium_batch"]
 
     rust_results = list(_rust_normalize_many_from_strings(json_strs))
 
-    import pandas as pd
     dicts = [json.loads(s) for s in json_strs]
     pandas_df = pd.json_normalize(dicts)
 
@@ -291,7 +301,7 @@ def test_correctness_rust_vs_pandas_medium(batch_data):
 
 def test_correctness_single_flat(single_objects):
     """Rust normalize_one and pandas produce identical results."""
-    import pandas as pd
+    pd = pytest.importorskip("pandas")
     json_str, py_dict = single_objects["flat"]
 
     rust_result = fjn.normalize_one(json_str)
@@ -302,7 +312,7 @@ def test_correctness_single_flat(single_objects):
 
 def test_correctness_single_nested_deep(single_objects):
     """Rust normalize_one and pandas produce identical results on deep nesting."""
-    import pandas as pd
+    pd = pytest.importorskip("pandas")
     json_str, py_dict = single_objects["nested_deep"]
 
     rust_result = fjn.normalize_one(json_str)
@@ -313,36 +323,36 @@ def test_correctness_single_nested_deep(single_objects):
 
 def test_correctness_dense(dense_schema):
     """Rust normalize_many and pandas produce identical results on dense schema."""
+    pd = pytest.importorskip("pandas")
     json_strs, py_dicts = dense_schema
     rust_results = list(_rust_normalize_many_from_strings(json_strs))
-    import pandas as pd
     pandas_df = pd.json_normalize(py_dicts)
     _compare_results(rust_results, pandas_df, "dense")
 
 
 def test_correctness_sparse(sparse_schema):
     """Rust normalize_many and pandas produce identical results on sparse schema."""
+    pd = pytest.importorskip("pandas")
     json_strs, py_dicts = sparse_schema
     rust_results = list(_rust_normalize_many_from_strings(json_strs))
-    import pandas as pd
     pandas_df = pd.json_normalize(py_dicts)
     _compare_results(rust_results, pandas_df, "sparse")
 
 
 def test_correctness_deep(deep_nesting_data):
     """Rust normalize_one and pandas produce identical results on deep nesting."""
+    pd = pytest.importorskip("pandas")
     json_strs, py_dicts = deep_nesting_data
     rust_result = fjn.normalize_one(json_strs[0])
-    import pandas as pd
     pandas_df = pd.json_normalize(py_dicts[0])
     _compare_results([rust_result], pandas_df, "deep")
 
 
 def test_correctness_unicode(unicode_heavy_data):
     """Rust normalize_many and pandas produce identical results on unicode data."""
+    pd = pytest.importorskip("pandas")
     json_strs, py_dicts = unicode_heavy_data
     rust_results = list(_rust_normalize_many_from_strings(json_strs))
-    import pandas as pd
     pandas_df = pd.json_normalize(py_dicts)
     _compare_results(rust_results, pandas_df, "unicode")
 
@@ -382,7 +392,8 @@ def test_stress_single_thread_sync():
     st_results = fjn.normalize_many(test_input)
     mt_results = fjn.normalize_many(test_input)
 
-    assert len(st_results) == len(mt_results), \
+    assert len(st_results) == len(mt_results), (
         f"Thread count affects result length: ST={len(st_results)} MT={len(mt_results)}"
+    )
     for r1, r2 in zip(st_results, mt_results):
         assert set(r1.keys()) == set(r2.keys()), "Key mismatch between threads"
