@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "rustjsonnorm"
 dynamic = ["version"]
-description = "Ultra-fast JSON normalization using Rust"
+description = "Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for pandas.json_normalize — up to 4.3x faster at scale."
 readme = "README.md"
 license = {text = "MIT"}
 classifiers = [
@@ -13,3 +13,4 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
+version = "0.2.1"

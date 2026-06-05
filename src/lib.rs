@@ -105,6 +105,8 @@ fn node_to_string(node: &simd_json::StaticNode) -> String {
 struct NdjsonIterator {
     reader: BufReader<File>,
     opts: Arc<FlattenOptions>,
+    strict: bool,
+    line_num: usize,
 }
 
 #[pymethods]
@@ -123,6 +125,7 @@ impl NdjsonIterator {
             if trimmed.is_empty() {
                 continue;
             }
+            slf.line_num += 1;
             match process_one(trimmed, &slf.opts) {
                 Ok(map) => {
                     let dict = PyDict::new_bound(py);
@@ -131,7 +134,12 @@ impl NdjsonIterator {
                     }
                     return Ok(Some(dict.into()));
                 }
-                Err(_) => continue, // skip malformed lines
+                Err(e) if slf.strict => {
+                    // In strict mode, include line number in the error message.
+                    let msg = format!("line {}: {}", slf.line_num, e.to_string());
+                    return Err(pyo3::exceptions::PyValueError::new_err(msg));
+                }
+                Err(_) => continue, // skip malformed lines (non-strict)
             }
         }
     }
@@ -142,14 +150,14 @@ impl NdjsonIterator {
 }
 
 #[pyfunction]
-#[pyo3(signature = (filepath, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
-fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, array_suffix: Option<&str>, max_depth: Option<usize>) -> PyResult<NdjsonIterator> {
+#[pyo3(signature = (filepath, sep=None, array_prefix=None, array_suffix=None, max_depth=None, strict=None))]
+fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, array_suffix: Option<&str>, max_depth: Option<usize>, strict: Option<bool>) -> PyResult<NdjsonIterator> {
     let mut opts = FlattenOptions::default();
     if let Some(s) = sep { opts.sep = s.to_string(); }
     if let Some(p) = array_prefix { opts.array_prefix = p.to_string(); }
     if let Some(s) = array_suffix { opts.array_suffix = s.to_string(); }
     if let Some(d) = max_depth { opts.max_depth = d; }
-    Ok(NdjsonIterator { reader: BufReader::new(File::open(filepath).map_err(|e| pyo3::exceptions::PyFileNotFoundError::new_err(e.to_string()))?), opts: Arc::new(opts) })
+    Ok(NdjsonIterator { reader: BufReader::new(File::open(filepath).map_err(|e| pyo3::exceptions::PyFileNotFoundError::new_err(e.to_string()))?), opts: Arc::new(opts), strict: strict.unwrap_or(false), line_num: 0 })
 }
 
 #[pyfunction]

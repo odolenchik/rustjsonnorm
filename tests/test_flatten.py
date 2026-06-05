@@ -264,3 +264,49 @@ def test_stream_ndjson_max_depth():
     finally:
         os.unlink(path)
 
+
+def test_stream_ndjson_strict_raises_on_bad_line():
+    ndjson_data = '{"a": 1}\nNOT_JSON\n{"b": 2}\n'
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+        f.write(ndjson_data)
+        path = f.name
+    try:
+        it = fjn.stream_ndjson(path, strict=True)
+        # First line parses fine
+        assert next(it) == {"a": "1"}
+        # Second line is malformed — raises ValueError with line number
+        with pytest.raises(ValueError) as exc_info:
+            next(it)
+        assert "line 2" in str(exc_info.value)
+    finally:
+        os.unlink(path)
+
+
+def test_stream_ndjson_strict_correct_line_number():
+    ndjson_data = '{"x": 1}\n\n{"y": 2}\nBAD_LINE\n{"z": 3}\n'
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+        f.write(ndjson_data)
+        path = f.name
+    try:
+        it = fjn.stream_ndjson(path, strict=True)
+        assert next(it) == {"x": "1"}  # logical line 1 (file line 1)
+        assert next(it) == {"y": "2"}  # logical line 2 (blank skipped)
+        with pytest.raises(ValueError) as exc_info:
+            next(it)
+        assert "line 3" in str(exc_info.value)  # BAD_LINE is logical line 3
+    finally:
+        os.unlink(path)
+
+
+def test_stream_ndjson_non_strict_default():
+    # Default (non-strict) should still skip bad lines silently
+    ndjson_data = '{"a": 1}\nBAD\n{"b": 2}\n'
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.ndjson', delete=False) as f:
+        f.write(ndjson_data)
+        path = f.name
+    try:
+        results = list(fjn.stream_ndjson(path))
+        assert len(results) == 2
+    finally:
+        os.unlink(path)
+

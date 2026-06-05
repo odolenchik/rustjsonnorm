@@ -109,13 +109,27 @@ The library is written in Rust and uses three key crates:
 
 The Rust crate compiles to a C-compatible shared library (`cdylib`) and is exposed via PyO3. Release builds use LTO + opt-level 3.
 
+## API Reference — stream_ndjson strict mode
+
+| Parameter | Default | Description |
+|---|---|---|
+| `strict` | `False` | When `True`, raises `ValueError` on malformed lines with line number and error message. When `False` (default), silently skips bad lines for backwards compatibility. |
+
+Example:
+
+```python
+# Strict mode — raises ValueError on first bad line
+for row in fjn.stream_ndjson("data.ndjson", strict=True):
+    process(row)
+```
+
 ## Test suite
 
 ```bash
 pytest tests/
 ```
 
-37 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, and streaming.
+40 tests covering primitives, arrays, nested objects, unicode, custom options, depth limits, parallel ordering, streaming, and strict-mode error handling.
 
 ## License
 
