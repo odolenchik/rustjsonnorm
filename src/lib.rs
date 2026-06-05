@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList, PyString};
 use simd_json::borrowed::{to_value, Value};
 use simd_json::prelude::*;
 use indexmap::IndexMap;
@@ -65,10 +65,10 @@ fn flatten_json(
 }
 
 fn process_one(
-    json_str: &str,
+    json_bytes: &[u8],
     opts: &FlattenOptions,
 ) -> PyResult<IndexMap<String, String>> {
-    let mut data: Vec<u8> = json_str.as_bytes().to_vec();
+    let mut data: Vec<u8> = json_bytes.to_vec();
     let value = to_value(&mut data)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
@@ -126,7 +126,7 @@ impl NdjsonIterator {
                 continue;
             }
             slf.line_num += 1;
-            match process_one(trimmed, &slf.opts) {
+            match process_one(trimmed.as_bytes(), &slf.opts) {
                 Ok(map) => {
                     let dict = PyDict::new_bound(py);
                     for (k, v) in map {
@@ -161,9 +161,9 @@ fn stream_ndjson(filepath: &str, sep: Option<&str>, array_prefix: Option<&str>, 
 }
 
 #[pyfunction]
-#[pyo3(signature = (json_str, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
+#[pyo3(signature = (json_input, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
 fn normalize_one(
-    json_str: &str,
+    json_input: &Bound<'_, PyAny>,
     sep: Option<&str>,
     array_prefix: Option<&str>,
     array_suffix: Option<&str>,
@@ -184,7 +184,19 @@ fn normalize_one(
         opts.max_depth = d;
     }
 
-    let result = process_one(json_str, &opts)?;
+ // Accept either str or bytes as input — simd-json works on &[u8] regardless.
+    let json_bytes: Vec<u8> = if json_input.is_instance_of::<PyString>() {
+        let s = json_input.downcast::<PyString>().unwrap();
+        let text: String = s.to_string_lossy().into_owned();
+        text.into_bytes()
+    } else if json_input.is_instance_of::<PyBytes>() {
+        let b = json_input.downcast::<PyBytes>().unwrap();
+        b.as_bytes().to_vec()
+    } else {
+        return Err(pyo3::exceptions::PyTypeError::new_err("Expected str or bytes"));
+    };
+
+    let result = process_one(&json_bytes, &opts)?;
 
     // Convert IndexMap<String, String> to Python dict
     let py_dict = PyDict::new_bound(py);
@@ -195,9 +207,9 @@ fn normalize_one(
 }
 
 #[pyfunction]
-#[pyo3(signature = (json_strs, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
+#[pyo3(signature = (json_inputs, sep=None, array_prefix=None, array_suffix=None, max_depth=None))]
 fn normalize_many(
-    json_strs: &Bound<'_, PyList>,
+    json_inputs: &Bound<'_, PyList>,
     sep: Option<&str>,
     array_prefix: Option<&str>,
     array_suffix: Option<&str>,
@@ -218,14 +230,25 @@ fn normalize_many(
         opts.max_depth = d;
     }
 
-    // Collect strings from PyList into a Vec<&str> for rayon
-    let strs: Vec<String> = json_strs.iter()
-        .map(|item| item.extract::<String>())
-        .collect::<Result<_, _>>()?;
+  // Collect byte slices from PyList (accepts str or bytes per item) for rayon.
+    let owned_bytes: Vec<Vec<u8>> = json_inputs.iter()
+        .map(|item| {
+            if item.is_instance_of::<PyString>() {
+                let s = item.downcast::<PyString>().unwrap();
+                let text: String = s.to_string_lossy().into_owned();
+                Ok(text.into_bytes())
+            } else if item.is_instance_of::<PyBytes>() {
+                let b = item.downcast::<PyBytes>().unwrap();
+                Ok(b.as_bytes().to_vec())
+            } else {
+                Err(pyo3::exceptions::PyTypeError::new_err("Each item must be str or bytes"))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let results: Vec<PyResult<IndexMap<String, String>>> = strs
+    let results: Vec<PyResult<IndexMap<String, String>>> = owned_bytes
         .par_iter()
-        .map(|s| process_one(s.as_str(), &opts))
+        .map(|bytes| process_one(bytes.as_slice(), &opts))
         .collect();
 
     // Convert all results to Python dicts in order
@@ -239,7 +262,7 @@ fn normalize_many(
         dicts.push(dict.into());
     }
 
-  let result = PyList::empty_bound(py);
+ let result = PyList::empty_bound(py);
 for item in dicts {
     result.append(item)?;
 }

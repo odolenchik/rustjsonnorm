@@ -310,3 +310,9 @@ def test_stream_ndjson_non_strict_default():
     finally:
         os.unlink(path)
 
+
+
+def test_normalize_one_accepts_bytes():
+    result = fjn.normalize_one(b'{"a": 1}')
+    assert result == {"a": "1"}
+
