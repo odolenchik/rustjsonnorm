@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "*"
+    ignore:
+      # Maturin major versions need manual review
+      - dependency-name: "maturin"

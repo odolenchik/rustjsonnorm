@@ -34,7 +34,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           command: build
-          args: --release --out ${{ matrix.artifact_name }} --interpreter python3
+          args: --release --out ${{ matrix.artifact_name }} --interpreter python3 --strip
 
   publish:
     needs: build_wheels
