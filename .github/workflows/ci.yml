@@ -19,6 +19,9 @@ jobs:
       - name: Build wheel
         run: maturin build --release --out dist --find-interpreter
       - name: Install wheel
-        run: pip install dist/*.whl
+        shell: bash
+        run: |
+          WHEEL=$(ls dist/*.whl | head -1)
+          pip install "$WHEEL"
       - name: Run tests
         run: pytest tests/
