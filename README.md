@@ -160,3 +160,5 @@ pytest tests/
 ## License
 
 MIT
+
+Keywords: json normalize, flatten nested json, simd json, fast json parser, parallel json processing, pandas replacement, rust python binding, ndjson stream
