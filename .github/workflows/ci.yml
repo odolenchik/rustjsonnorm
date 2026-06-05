@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: pip install maturin pytest pandas coverage
+        run: pip install maturin pytest pytest-cov pandas
       - name: Build wheel
         run: maturin build --release --out dist --find-interpreter
       - name: Install wheel
