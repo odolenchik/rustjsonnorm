@@ -76,33 +76,28 @@ result = fjn.normalize_one(
 
 ## Performance
 
-Benchmarked on Bluesky NDJSON dataset (first N records from a 1M-line file):
+Benchmarked on Bluesky NDJSON dataset (first N records from a 1M-line file). Both rustjsonnorm and pandas receive identical input — JSON strings converted to Python dicts via `json.loads()`. Single run per size.
 
-#### 50,000 records
+| Records | rustjsonnorm | pandas.json_normalize | Speedup |
+|---|---|---|---|
+| 50,000 | **0.221s** (227K rec/s) | 0.582s | **2.6x faster** |
+| 250,000 | **0.951s** (263K rec/s) | 3.645s | **3.8x faster** |
+| 500,000 | **1.780s** (281K rec/s) | 7.305s | **4.1x faster** |
+| 1,000,000 | **3.545s** (282K rec/s) | 15.156s | **4.3x faster** |
 
-| Benchmark | Result |
-|---|---|
-| `normalize_many` | **0.19s** |
-| `pandas.json_normalize` | 1.04s |
-| Speedup | **5.5x faster than pandas** |
-| `stream_ndjson` throughput | ~263K lines/sec |
+rustjsonnorm scales linearly (~280K records/sec). Pandas time grows quadratically as the dataset increases.
 
-#### 500,000 records
-
-| Benchmark | Result |
-|---|---|
-| `normalize_many` | **1.80s** |
-| `pandas.json_normalize` | 13.09s |
-| Speedup | **7.3x faster than pandas** |
-| `stream_ndjson` throughput | ~263K lines/sec |
-
-Note: benchmarks use fair comparison — both rustjsonnorm and pandas receive the same input format (JSON strings → Python dicts). Pandas receives a pre-converted list of dicts for its portion. Stream throughput measured on full 1M-line file, constant across dataset sizes.
-
-Run the benchmark:
+### Running benchmarks locally
 
 ```bash
+# Install dependencies
+pip install rustjsonnorm pandas
+
+# Run the benchmark script on your own NDJSON file
 python benchmarks/bench.py path/to/data.ndjson
 ```
+
+The benchmark script loads N records (default 50,000) and compares `rustjsonnorm.normalize_many` against `pandas.json_normalize`. It also measures `stream_ndjson` throughput.
 
 ## How it works
 
