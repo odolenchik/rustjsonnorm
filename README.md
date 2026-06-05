@@ -1,6 +1,6 @@
 # rustjsonnorm v0.2.4
 
-Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **108x faster** at scale.
+Ultra-fast JSON normalization in Rust, exposed as a Python package. Drop-in replacement for `pandas.json_normalize` — up to **4.3x faster** at scale.
 
 ## Install
 
