@@ -350,7 +350,7 @@ fn normalize_many(
 
         if !matches!(value, Value::Object(_)) {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "Top-level JSON must be an object",
+                "Each input item must be a JSON object (start with '{'}', not array or primitive)",
             ));
         }
 
