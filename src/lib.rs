@@ -348,14 +348,16 @@ fn normalize_many(
         let value = to_value(data.as_mut_slice())
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
-        let actual_type = match value {
-            Value::Array(_) => "array",
-            _ => "other",
-        };
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "Each input item must be a JSON object, got {}",
-            actual_type
-        )));
+        if !matches!(value, Value::Object(_)) {
+            let actual_type = match value {
+                Value::Array(_) => "array",
+                _ => "other",
+            };
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Each input item must be a JSON object, got {}",
+                actual_type
+            )));
+        }
 
         let mut result = IndexMap::<String, String>::new();
         flatten_json_to_strings(&value, "", &mut result, &opts, 0);
