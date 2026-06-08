@@ -5,8 +5,6 @@ Usage:
     python run_benchmarks.py --json   # output as JSON for programmatic use
 """
 
-import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -23,11 +21,16 @@ def generate_data():
 def run_benchmark(test_names: list[str]):
     """Run specific benchmark tests and return parsed results."""
     cmd = [
-        sys.executable, "-m", "pytest", str(Path(__file__).parent / "test_benchmarks.py"),
-        "-v", "--benchmark-only",
+        sys.executable,
+        "-m",
+        "pytest",
+        str(Path(__file__).parent / "test_benchmarks.py"),
+        "-v",
+        "--benchmark-only",
         "--benchmark-min-rounds=3",
         "--benchmark-warmup=False",
-        "-k", " or ".join(test_names),
+        "-k",
+        " or ".join(test_names),
     ]
 
     print(f"\nRunning benchmarks: {', '.join(test_names)}")
@@ -43,7 +46,8 @@ def parse_benchmark_results(stdout: str):
         if "rust" in line.lower() or "pandas" in line.lower():
             # Look for timing info like "10.2 ms ± ..."
             import re
-            match = re.search(r'(\d+\.\d+)\s*ms', line)
+
+            match = re.search(r"(\d+\.\d+)\s*ms", line)
             if match and ("rustjsonnorm" not in line or "rust" in line):
                 test_name = line.strip().split()[0] if line.split() else ""
                 results[test_name] = float(match.group(1))
