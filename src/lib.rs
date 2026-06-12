@@ -14,25 +14,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
-/// Convert a `simd_json` value to its string representation.
-fn value_to_string(v: &core::Value<'_>) -> String {
-    match v {
-        core::Value::String(s) => s.to_string(),
-        core::Value::Static(node) => node_to_string(node),
-        _ => unreachable!("expected String or Static, got {:?}", v),
-    }
-}
-
-fn node_to_string(node: &simd_json::StaticNode) -> String {
-    match node {
-        simd_json::StaticNode::Bool(b) => b.to_string(),
-        simd_json::StaticNode::I64(n) => n.to_string(),
-        simd_json::StaticNode::U64(n) => n.to_string(),
-        simd_json::StaticNode::F64(n) => n.to_string(),
-        simd_json::StaticNode::Null => "null".to_string(),
-    }
-}
-
 /// Leaf handler that collects (key, PyObject) pairs for type-preserving mode.
 struct PyObjectHandler<'py> {
     py: Python<'py>,
@@ -75,7 +56,9 @@ struct StringHandler {
 
 impl LeafHandler for StringHandler {
     fn handle_leaf(&mut self, key: &str, value: &core::Value<'_>) {
-        self.out.insert(key.to_string(), value_to_string(value));
+        if let Some(s) = core::value_to_string(value) {
+            self.out.insert(key.to_string(), s);
+        }
     }
 }
 
@@ -119,6 +102,9 @@ struct FlattenOptions {
     preserve_types: bool,
 }
 
+/// Hard cap for max_depth to prevent stack overflow from user-provided values.
+const MAX_DEPTH_CAP: usize = 1024;
+
 impl Default for FlattenOptions {
     fn default() -> Self {
         Self {
@@ -132,6 +118,11 @@ impl Default for FlattenOptions {
 }
 
 impl FlattenOptions {
+    /// Set max_depth with a hard cap to prevent stack overflow.
+    fn set_max_depth(&mut self, d: usize) {
+        self.max_depth = d.min(MAX_DEPTH_CAP);
+    }
+
     fn to_core(&self) -> core::FlattenOptions {
         core::FlattenOptions {
             sep: self.sep.clone(),
@@ -263,7 +254,7 @@ fn stream_ndjson(
         opts.array_suffix = s.to_string();
     }
     if let Some(d) = max_depth {
-        opts.max_depth = d;
+        opts.set_max_depth(d);
     }
     if let Some(pt) = preserve_types {
         opts.preserve_types = pt;
@@ -302,7 +293,7 @@ fn normalize_one(
         opts.array_suffix = s.to_string();
     }
     if let Some(d) = max_depth {
-        opts.max_depth = d;
+        opts.set_max_depth(d);
     }
     if let Some(pt) = preserve_types {
         opts.preserve_types = pt;
@@ -354,7 +345,7 @@ fn normalize_many(
         opts.array_suffix = s.to_string();
     }
     if let Some(d) = max_depth {
-        opts.max_depth = d;
+        opts.set_max_depth(d);
     }
     if let Some(pt) = preserve_types {
         opts.preserve_types = pt;
